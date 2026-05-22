@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import httpx
 from fastapi import APIRouter
 
@@ -22,11 +22,11 @@ async def get_exchange_rate():
             return {
                 "rate": rate,
                 "source": "banxico",
-                "fetched_at": datetime.utcnow().isoformat(),
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
             }
     except Exception:
         return {
             "rate": FALLBACK_RATE,
             "source": "fallback",
-            "fetched_at": datetime.utcnow().isoformat(),
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
         }
