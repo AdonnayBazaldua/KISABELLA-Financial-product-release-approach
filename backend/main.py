@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from secure import SecureHeaders
+import secure
 
 from api.evaluations import router as evaluations_router
 from api.exchange_rate import router as exchange_rate_router
@@ -21,13 +21,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-secure_headers = SecureHeaders()
+secure_headers = secure.Secure()
 
 
 @app.middleware("http")
-async def add_security_headers(request, call_next):
+async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
-    secure_headers.framework.fastapi(response)
+    for header, value in secure_headers.headers().items():
+        response.headers[header] = value
     return response
 
 
