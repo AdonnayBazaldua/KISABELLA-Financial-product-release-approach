@@ -108,30 +108,44 @@ Sintetiza y decide. No tiene score propio.
 
 ```
 1. Usuario llena el formulario (datos de producto, costos, precio, volumen)
-2. Sistema consulta TC USD/MXN en tiempo real (Banxico)
-3. Pipeline LangGraph se dispara
-4. Agentes 1-4 corren en paralelo (~30-60 segundos total)
-5. Orquestador consolida y genera veredicto
-6. Dashboard muestra: semáforo + scorecard + análisis extenso por agente
-7. Usuario puede hacer preguntas de seguimiento en chat
-8. Evaluación se guarda para historial y comparativas futuras
+2. POST /api/evaluations devuelve 202 + evaluation_id (en <2 segundos)
+3. BackgroundTask consulta TC USD/MXN (Banxico con cache 1h, fallback a último valor en DB)
+4. Pipeline LangGraph se dispara en background con status=running
+5. Agentes 1-4 corren en paralelo (asyncio.gather, ~30-60s total, timeout 90s)
+6. Orquestador espera a los 4, sintetiza y emite veredicto final
+   - ≥3 agentes OK → veredicto normal
+   - 2 OK → viable_con_ajustes + requires_human_review
+   - ≤1 OK → no_viable + "Datos insuficientes"
+7. Frontend hace polling cada 2s sobre GET /api/evaluations/{id}
+8. Status pasa pending → queued → running → complete (o error)
+9. Dashboard muestra: semáforo + scorecard + análisis extenso por agente + warn flags
+10. Usuario puede re-evaluar (crea evaluación nueva, audit trail inmutable) o hacer chat de seguimiento
 ```
+
+**Degradación graceful**: si Tavily falla, el agente Mercado procede sin búsqueda web (flag `warn_no_web`). Si Banxico falla, se usa el último TC en DB (flag `warn_fx`).
+
+**Idempotencia**: dos submits idénticos en 30s → 409 Conflict (no se crean evaluaciones duplicadas).
 
 ---
 
 ## Decisiones de diseño importantes
 
-| Decisión | Elección | Razón |
-|----------|----------|-------|
-| LLM | Claude Sonnet 4.6 | Razonamiento financiero sólido, costo/calidad óptimo para uso iterativo |
-| Orquestación | LangGraph | Diseñado para grafos de agentes con nodos paralelos y estado compartido |
-| Búsqueda web | Tavily | Integración nativa con LangChain, resultados limpios para agentes |
-| TC en tiempo real | API Banxico | Fuente oficial MXN, gratuita para uso interno |
-| Persistencia de TC | Guardar TC al momento | El análisis histórico debe reproducirse con el TC original |
-| Despliegue | Docker en VPS IONOS | Infraestructura simple, sin costo de plataforma cloud, control total |
-| Acceso | IP whitelist en Nginx | 2-3 usuarios internos, sin necesidad de sistema de auth complejo |
-| Base de datos | PostgreSQL + RLS | Seguridad a nivel de fila, robusto para historial y comparativas |
-| Idioma | Español | Equipo y contexto de negocio 100% en español |
+| Decisión | Elección | Razón | ADR |
+|----------|----------|-------|-----|
+| LLM | Claude Sonnet 4.6 vía `langchain-anthropic` | Razonamiento financiero sólido. `with_structured_output` valida Pydantic. | ADR-007 |
+| Orquestación | LangGraph | Grafos con nodos paralelos y estado compartido. Fan-out → fan-in nativo. | ADR-001 |
+| Patrón agente | Funciones puras `AgentFn`, no clases | Composability + testeable con `FakeLLMClient`. Sumar agente = 1 línea registry. | ADR-001 |
+| Pipeline | Async vía BackgroundTasks. POST devuelve 202. | Evita timeout Nginx con 4 agentes paralelos. Frontend hace polling. | ADR-006 |
+| Búsqueda web | Tavily, llamado directo (NO bind_tools) | Determinístico, cache controlado, prompts más cortos. | ADR-011 |
+| TC en tiempo real | Banxico con cache 1h + fallback DB | Fuente oficial. Sin runaway de quota. | — |
+| Persistencia de TC | `exchange_rate_used` + `exchange_rate_at` | Análisis histórico reproduce con el TC original, no el actual. | ADR-005 |
+| Despliegue | Docker Compose en VPS IONOS ($8-12/mes) | TCO ~$100/año. IP whitelist nativa. Sin vendor lock-in. | ADR-009 |
+| Acceso | IP whitelist en Nginx (renderada desde env) | 2-3 users internos. Sin auth compleja. | ADR-010 |
+| Base de datos | PostgreSQL 16 + RLS efectivo (FORCE + bindparams) | Defensa-en-profundidad real, no solo declarada. | ADR-008 |
+| Tipos compartidos | `openapi-typescript` codegen | Drift backend/frontend imposible. | ADR-004 |
+| Idioma | Español end-to-end (UI, prompts, errores) | Equipo y contexto 100% español. | — |
+
+Las ADRs viven en `docs/adr/`. Una ADR nueva por cualquier decisión que afecte 2+ sprints.
 
 ---
 
