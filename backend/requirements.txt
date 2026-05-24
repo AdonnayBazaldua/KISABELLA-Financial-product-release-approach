@@ -9,21 +9,23 @@ pydantic-settings==2.6.1
 
 # Database
 sqlalchemy[asyncio]==2.0.36
-psycopg[async,binary]==3.2.3
+psycopg[binary]==3.2.3
+alembic>=1.13,<2.0
 
-# HTTP client (Banxico, etc.)
+# HTTP client (Banxico, Tavily)
 httpx==0.28.1
 
-# LLM stack — versiones compatibles (anthropic resuelto por langchain-anthropic)
+# LLM stack — ADR-007 langchain-anthropic, NO SDK anthropic directo
 langchain>=0.3.10,<0.4
 langchain-anthropic>=0.3.3,<0.4
 langgraph>=0.2.59,<0.3
 anthropic>=0.42,<1.0
 
-# Security
+# Security headers (FastAPI middleware)
 secure==0.3.0
 
-# Testing
-pytest==8.3.4
-pytest-asyncio==0.24.0
-pytest-mock==3.14.0
+# Retry policy (LLM calls, Banxico, Tavily)
+tenacity>=8.5,<10
+
+# Structured logging
+structlog>=24,<26
