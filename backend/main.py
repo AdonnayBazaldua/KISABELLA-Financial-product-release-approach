@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.v1.evaluations import router as evaluations_router
 from core.config import get_settings
 from core.security import IPWhitelistMiddleware, SecurityHeadersMiddleware
 from db.session import dispose_engine
@@ -62,7 +63,6 @@ def create_app() -> FastAPI:
     async def health():
         return {"status": "ok", "version": app.version}
 
+    app.include_router(evaluations_router)
+
     return app
-
-
-app = create_app()
