@@ -6,6 +6,4 @@
   --radius: 0.5rem;
 }
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
+/* Hereda de Inter cargado por next/font en layout.tsx — NO sobreescribir aquí. */
