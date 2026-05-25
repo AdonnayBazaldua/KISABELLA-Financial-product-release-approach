@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, TypedDict
+from typing import Annotated, Literal, TypedDict
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -138,18 +138,39 @@ class TCMetadata(BaseModel):
     is_stale: bool = False
 
 
+# --- LangGraph reducers ---
+# Los reducers determinan cómo merge-ar valores cuando múltiples nodos paralelos
+# escriben al mismo campo del state. Sin reducer, default es "last write wins".
+
+
+def _merge_agent_results(
+    left: dict | None, right: dict | None
+) -> dict[SpecialistName, AgentResult | AgentError]:
+    """Merge dict-of-dicts: cada nodo escribe su key, no se pisan."""
+    return {**(left or {}), **(right or {})}
+
+
+def _merge_warn_flags(left: list | None, right: list | None) -> list[str]:
+    """Concat + deduplica preservando orden."""
+    return list(dict.fromkeys((left or []) + (right or [])))
+
+
 class PipelineState(TypedDict, total=False):
     """Estado mutable del grafo LangGraph (ADR-002).
 
     `agent_results` es la única manera de identificar qué agente corrió.
     NUNCA agregar campos por agente nombrados (financiero_result, etc.).
     Sumar un agente nuevo = entrada en la dict, no cambio del shape.
+
+    Los campos Annotated tienen reducer para merge paralelo correcto.
     """
 
     eval_id: UUID
     user_id: UUID
     inputs: EvaluationInputs
     tc_meta: TCMetadata
-    agent_results: dict[SpecialistName, AgentResult | AgentError]
+    agent_results: Annotated[
+        dict[SpecialistName, AgentResult | AgentError], _merge_agent_results
+    ]
     final_verdict: FinalVerdict | None
-    warn_flags: list[str]
+    warn_flags: Annotated[list[str], _merge_warn_flags]
