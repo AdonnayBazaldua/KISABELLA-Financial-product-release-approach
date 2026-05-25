@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { EvaluationDetail, AgentResult, Verdict } from "@/lib/types";
+import { EvaluationDetail, AgentResultDTO, Verdict } from "@/lib/types";
 import { ChevronDown, ChevronRight, TrendingUp, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 
 const VERDICT_CONFIG: Record<Verdict, { label: string; bgColor: string; borderColor: string; icon: React.ReactNode }> = {
@@ -43,7 +43,7 @@ function ScoreBar({ value }: { value: number }) {
   );
 }
 
-function AgentCard({ result }: { result: AgentResult }) {
+function AgentCard({ result }: { result: AgentResultDTO }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border rounded-lg mb-4 bg-white">
@@ -53,8 +53,8 @@ function AgentCard({ result }: { result: AgentResult }) {
             {AGENT_LABELS[result.agent_name] ?? result.agent_name}
           </h3>
           <div className="flex items-center gap-3">
-            <span className="text-sm font-bold text-slate-900">{result.score}/100</span>
-            <ScoreBar value={result.score} />
+            <span className="text-sm font-bold text-slate-900">{result.score ?? "—"}/100</span>
+            <ScoreBar value={result.score ?? 0} />
           </div>
         </div>
         <p className="text-sm text-slate-500 italic">{result.veredicto_corto}</p>
@@ -114,7 +114,7 @@ export function FinancialResult({ evaluation }: { evaluation: EvaluationDetail }
     <div className="max-w-3xl mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold text-slate-900 mb-2">{evaluation.name}</h1>
       <p className="text-sm text-slate-500 mb-6">
-        {evaluation.inputs?.product_name} · TC: ${evaluation.inputs?.exchange_rate_used?.toFixed(2)} MXN/USD
+        {evaluation.product_name}
       </p>
 
       {config && verdict && (
