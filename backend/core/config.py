@@ -1,15 +1,92 @@
+"""Settings tipados de CAPI-KISABELLA.
+
+Validación estricta al startup: si falta una variable required o tiene
+formato inválido, el proceso falla rápido con ValidationError.
+
+Convenciones:
+- Secrets se modelan como SecretStr para evitar logging accidental.
+- DATABASE_URL solo acepta schemes postgresql.
+- LOG_LEVEL es un Literal cerrado (Python logging levels estándar).
+- SECRET_KEY debe tener al menos 32 caracteres.
+
+Uso desde FastAPI:
+    from core.config import get_settings
+    settings = get_settings()  # cacheado vía lru_cache
+
+Uso desde tests:
+    Settings(_env_file=None, anthropic_api_key="test", ...)
+"""
+
+from functools import lru_cache
+from typing import Literal
+
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
-    anthropic_api_key: str
+    # --- LLM (ADR-007: langchain-anthropic) ---
+    anthropic_api_key: SecretStr
+    anthropic_model: str = "claude-sonnet-4-6"
+
+    # --- Servicios externos ---
+    tavily_api_key: SecretStr = Field(default=SecretStr(""))
+    banxico_token: SecretStr = Field(default=SecretStr(""))
+
+    # --- Base de datos ---
     database_url: str
+
+    # --- Seguridad ---
+    secret_key: SecretStr
+    allowed_ips: str = "127.0.0.1"
+
+    # --- Contexto RLS (ADR-008) ---
     app_user_id: str = "00000000-0000-0000-0000-000000000001"
-    banxico_token: str = ""
-    tavily_api_key: str = ""
-    secret_key: str = "dev-secret-change-in-production"
+
+    # --- Frontend / red interna Docker ---
+    api_url_internal: str = "http://backend:8000"
+    next_public_api_url: str = "http://localhost:8000"
+
+    # --- Observabilidad ---
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+
+    @field_validator("secret_key")
+    @classmethod
+    def _secret_key_min_length(cls, v: SecretStr) -> SecretStr:
+        if len(v.get_secret_value()) < 32:
+            raise ValueError(
+                "SECRET_KEY debe tener al menos 32 caracteres "
+                "(generar con: python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+            )
+        return v
+
+    @field_validator("database_url")
+    @classmethod
+    def _database_url_scheme(cls, v: str) -> str:
+        valid_schemes = (
+            "postgresql://",
+            "postgresql+psycopg://",
+            "postgresql+asyncpg://",
+        )
+        if not v.startswith(valid_schemes):
+            raise ValueError(
+                f"DATABASE_URL debe usar uno de estos schemes: {', '.join(valid_schemes)}"
+            )
+        return v
 
 
-settings = Settings()
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Singleton de Settings cacheado.
+
+    Lazy: la primera llamada lee `.env` y valida. Si falta alguna var
+    required o el formato es inválido, lanza ValidationError aquí (no en import).
+    """
+    return Settings()

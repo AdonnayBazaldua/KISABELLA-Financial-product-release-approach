@@ -58,7 +58,7 @@ export function EvaluationForm() {
     setForm((f) => ({
       ...f,
       cost_purchase_usd: value,
-      cost_purchase: parseFloat((value * f.exchange_rate_used).toFixed(2)),
+      cost_purchase: parseFloat((value * Number(f.exchange_rate_used)).toFixed(2)),
     }));
   }
 
@@ -90,35 +90,35 @@ export function EvaluationForm() {
           <label className="text-sm font-medium text-slate-600">Descripción</label>
           <textarea
             name="description"
-            value={form.description}
+            value={form.description ?? ""}
             onChange={(e) => handleChange("description", e.target.value)}
             rows={3}
             className="w-full border rounded-md px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-slate-400"
           />
         </div>
-        <CostField label="Canal de venta" name="sales_channel" value={form.sales_channel} onChange={handleChange} type="text" />
+        <CostField label="Canal de venta" name="sales_channel" value={form.sales_channel ?? ""} onChange={handleChange} type="text" />
       </CostSection>
 
       <CostSection title="2. Estructura de Costos">
         <div className="col-span-2 flex items-center gap-3 p-3 bg-slate-50 rounded-lg mb-2">
           <span className="text-sm font-medium text-slate-600">TC USD/MXN:</span>
-          <span className="font-bold text-slate-900">${form.exchange_rate_used.toFixed(4)}</span>
+          <span className="font-bold text-slate-900">${Number(form.exchange_rate_used).toFixed(4)}</span>
           <button type="button" onClick={fetchTC} className="text-slate-500 hover:text-slate-800">
             {tcLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           </button>
         </div>
-        <CostField label="Costo de compra (USD)" name="cost_purchase_usd" value={form.cost_purchase_usd} onChange={(_, v) => handleUSD(v as number)} suffix="USD" />
+        <CostField label="Costo de compra (USD)" name="cost_purchase_usd" value={form.cost_purchase_usd ?? 0} onChange={(_, v) => handleUSD(v as number)} suffix="USD" />
         <CostField label="Costo de compra (MXN)" name="cost_purchase" value={form.cost_purchase} onChange={handleChange} suffix="MXN" />
-        <CostField label="Flete internacional" name="cost_freight" value={form.cost_freight} onChange={handleChange} suffix="MXN" />
-        <CostField label="Aranceles / Importación" name="cost_customs" value={form.cost_customs} onChange={handleChange} suffix="MXN" />
-        <CostField label="Almacenamiento mensual" name="cost_storage" value={form.cost_storage} onChange={handleChange} suffix="MXN/mes" />
-        <CostField label="Logística — Vehículo" name="cost_logistics_vehicle" value={form.cost_logistics_vehicle} onChange={handleChange} suffix="MXN" />
-        <CostField label="Logística — Viáticos" name="cost_logistics_viaticos" value={form.cost_logistics_viaticos} onChange={handleChange} suffix="MXN" />
-        <CostField label="Logística — Personal" name="cost_logistics_personnel" value={form.cost_logistics_personnel} onChange={handleChange} suffix="MXN" />
-        <CostField label="Merma / Devoluciones" name="cost_shrinkage_pct" value={form.cost_shrinkage_pct} onChange={handleChange} suffix="%" />
-        <CostField label="Comisión vendedor / canal" name="cost_commission_pct" value={form.cost_commission_pct} onChange={handleChange} suffix="%" />
-        <CostField label="Marketing mensual" name="cost_marketing" value={form.cost_marketing} onChange={handleChange} suffix="MXN/mes" />
-        <CostField label="Overhead prorrateado" name="cost_overhead" value={form.cost_overhead} onChange={handleChange} suffix="MXN/mes" />
+        <CostField label="Flete internacional" name="cost_freight" value={form.cost_freight ?? 0} onChange={handleChange} suffix="MXN" />
+        <CostField label="Aranceles / Importación" name="cost_customs" value={form.cost_customs ?? 0} onChange={handleChange} suffix="MXN" />
+        <CostField label="Almacenamiento mensual" name="cost_storage" value={form.cost_storage ?? 0} onChange={handleChange} suffix="MXN/mes" />
+        <CostField label="Logística — Vehículo" name="cost_logistics_vehicle" value={form.cost_logistics_vehicle ?? 0} onChange={handleChange} suffix="MXN" />
+        <CostField label="Logística — Viáticos" name="cost_logistics_viaticos" value={form.cost_logistics_viaticos ?? 0} onChange={handleChange} suffix="MXN" />
+        <CostField label="Logística — Personal" name="cost_logistics_personnel" value={form.cost_logistics_personnel ?? 0} onChange={handleChange} suffix="MXN" />
+        <CostField label="Merma / Devoluciones" name="cost_shrinkage_pct" value={form.cost_shrinkage_pct ?? 0} onChange={handleChange} suffix="%" />
+        <CostField label="Comisión vendedor / canal" name="cost_commission_pct" value={form.cost_commission_pct ?? 0} onChange={handleChange} suffix="%" />
+        <CostField label="Marketing mensual" name="cost_marketing" value={form.cost_marketing ?? 0} onChange={handleChange} suffix="MXN/mes" />
+        <CostField label="Overhead prorrateado" name="cost_overhead" value={form.cost_overhead ?? 0} onChange={handleChange} suffix="MXN/mes" />
       </CostSection>
 
       <CostSection title="3. Precio y Volumen">
