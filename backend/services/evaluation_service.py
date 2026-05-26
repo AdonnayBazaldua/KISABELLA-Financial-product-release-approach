@@ -7,7 +7,6 @@ BackgroundTask. El service expone create() (sync con DB) y run_pipeline()
 Sprint 1 / Fase 0: el flujo es funcional pero algunos detalles son stub:
 - TC viene del payload (Banxico real en Sprint 6).
 - Watchdog de huérfanos: TODO (Sprint 6).
-- Idempotency key: TODO (Sprint 2).
 """
 
 from __future__ import annotations
