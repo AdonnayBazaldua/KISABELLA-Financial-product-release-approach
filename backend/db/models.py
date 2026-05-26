@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from sqlalchemy import String, Numeric, Integer, Text, DateTime, ForeignKey, JSON, SmallInteger
+from sqlalchemy import String, Numeric, Integer, Text, DateTime, ForeignKey, JSON, SmallInteger, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -30,6 +30,9 @@ class Evaluation(Base):
     final_score: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     final_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    warn_flags: Mapped[list] = mapped_column(JSON, default=list)
+    requires_human_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    idempotency_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
