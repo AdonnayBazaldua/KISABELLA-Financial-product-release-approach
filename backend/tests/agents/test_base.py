@@ -6,6 +6,7 @@ from decimal import Decimal
 import pytest
 
 from agents.base import build_agent, load_prompt
+from agents.calculations.market import calculate_market
 from agents.contracts import AgentResult, EvaluationInputs
 from agents.llm_client import FakeLLMClient
 
@@ -66,7 +67,7 @@ class TestBuildAgent:
         fake = FakeLLMClient()
         fake.set_response_for(AgentResult, _make_agent_result(score=70))
 
-        agent = build_agent(name="test", prompt_name="market")
+        agent = build_agent(name="test", prompt_name="market", calc_fn=calculate_market)
         result = await agent(_make_inputs(product_name="Test Producto"), fake)
 
         assert isinstance(result, AgentResult)
@@ -84,6 +85,7 @@ class TestBuildAgent:
         agent = build_agent(
             name="test",
             prompt_name="market",
+            calc_fn=calculate_market,
             score_fn=always_99,
         )
         result = await agent(_make_inputs(), fake)
@@ -94,7 +96,7 @@ class TestBuildAgent:
         fake = FakeLLMClient()
         fake.set_response_for(AgentResult, _make_agent_result(score=42))
 
-        agent = build_agent(name="test", prompt_name="market")
+        agent = build_agent(name="test", prompt_name="market", calc_fn=calculate_market)
         result = await agent(_make_inputs(), fake)
 
         assert result.score == 42
