@@ -1,11 +1,10 @@
-"""Agente Mercado — stub Sprint 1 (Tavily se integra en Sprint 6).
-
-El LLM decide el score (sin score_fn determinístico, a diferencia del Financiero).
-"""
+"""Agente Mercado — análisis de mercado con pre-cálculos de competitividad."""
 
 from agents.base import build_agent
+from agents.calculations.market import calculate_market
 
 market_agent = build_agent(
     name="mercado",
     prompt_name="market",
+    calc_fn=calculate_market,
 )
