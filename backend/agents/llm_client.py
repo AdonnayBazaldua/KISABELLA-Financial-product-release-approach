@@ -171,6 +171,74 @@ class FakeLLMClient:
         )
 
 
+class BudgetExhaustedError(Exception):
+    """Raised when a per-evaluation budget cap is exceeded."""
+
+    def __init__(self, resource: str, used: int, limit: int) -> None:
+        self.resource = resource
+        self.used = used
+        self.limit = limit
+        super().__init__(
+            f"Budget exhausted: {resource} — used {used}, limit {limit}"
+        )
+
+
+class BudgetedLLMClient:
+    """Wrapper that enforces per-evaluation hard caps on LLM usage.
+
+    Caps (from CLAUDE.md):
+    - max_calls: 6 (4 agents + margin for retries)
+    - max_input_tokens: 20,000
+    """
+
+    def __init__(
+        self,
+        inner: LLMClient,
+        max_calls: int = 6,
+        max_input_tokens: int = 20_000,
+    ) -> None:
+        self._inner = inner
+        self._max_calls = max_calls
+        self._max_input_tokens = max_input_tokens
+        self._calls_used = 0
+        self._tokens_used = 0
+
+    def _estimate_tokens(self, system: str, user: str) -> int:
+        return (len(system) + len(user)) // 4
+
+    async def request_structured(
+        self,
+        *,
+        system: str,
+        user: str,
+        schema: type[T],
+        temperature: float | None = None,
+    ) -> T:
+        if self._calls_used >= self._max_calls:
+            raise BudgetExhaustedError("calls", self._calls_used, self._max_calls)
+
+        estimated = self._estimate_tokens(system, user)
+        if self._tokens_used + estimated > self._max_input_tokens:
+            raise BudgetExhaustedError(
+                "tokens", self._tokens_used + estimated, self._max_input_tokens
+            )
+
+        self._calls_used += 1
+        self._tokens_used += estimated
+        return await self._inner.request_structured(
+            system=system, user=user, schema=schema, temperature=temperature
+        )
+
+    @property
+    def budget_summary(self) -> dict:
+        return {
+            "calls_used": self._calls_used,
+            "calls_max": self._max_calls,
+            "tokens_estimated": self._tokens_used,
+            "tokens_max": self._max_input_tokens,
+        }
+
+
 @lru_cache(maxsize=1)
 def get_llm_client() -> AnthropicLLMClient:
     """Singleton lazy. Llama get_settings() y construye AnthropicLLMClient.

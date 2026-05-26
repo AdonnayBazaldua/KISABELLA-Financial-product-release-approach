@@ -26,7 +26,7 @@ from agents.contracts import (
     TCMetadata,
 )
 from agents.financial import financial_agent
-from agents.llm_client import LLMClient
+from agents.llm_client import BudgetedLLMClient, LLMClient
 from agents.market import market_agent
 from agents.orchestrator import orchestrator_node
 from agents.risk import risk_agent
@@ -102,7 +102,8 @@ async def run_evaluation(
     user_id=None,
 ) -> PipelineState:
     """Helper: corre el pipeline completo y retorna el state final."""
-    pipeline = build_pipeline(llm)
+    budgeted = BudgetedLLMClient(llm)
+    pipeline = build_pipeline(budgeted)
     initial: PipelineState = {
         "inputs": inputs,
         "tc_meta": tc_meta,
