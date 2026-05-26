@@ -29,7 +29,7 @@ SpecialistName = Literal["financiero", "mercado", "riesgo", "estrategia"]
 TCSource = Literal["banxico", "fallback_db", "user_provided"]
 Confidence = Literal["high", "medium", "low"]
 AgentErrorType = Literal[
-    "parsing", "timeout", "rate_limit", "tool_failure", "validation", "unknown"
+    "parsing", "timeout", "rate_limit", "tool_failure", "validation", "budget", "unknown"
 ]
 
 
