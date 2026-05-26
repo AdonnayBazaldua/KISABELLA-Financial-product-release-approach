@@ -26,7 +26,7 @@ from api.v1.schemas import (
 )
 from core.config import Settings, get_settings
 from db.session import _ensure_engine, get_db
-from services.evaluation_service import EvaluationService
+from services.evaluation_service import DuplicateEvaluationError, EvaluationService
 
 router = APIRouter(prefix="/api/v1", tags=["evaluations"])
 
@@ -88,7 +88,13 @@ async def create_evaluation(
     service: EvaluationService = Depends(get_eval_service),
 ) -> EvaluationCreated:
     """Crea evaluación + dispara pipeline async. Retorna 202 inmediato."""
-    created = await service.create(req, db)
+    try:
+        created = await service.create(req, db)
+    except DuplicateEvaluationError:
+        raise HTTPException(
+            status_code=409,
+            detail={"detail": "Evaluación duplicada — esperá 30s antes de re-enviar", "code": "DUPLICATE"},
+        )
     background.add_task(service.run_pipeline, created.evaluation_id, req)
     return created
 

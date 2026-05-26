@@ -7,13 +7,14 @@ BackgroundTask. El service expone create() (sync con DB) y run_pipeline()
 Sprint 1 / Fase 0: el flujo es funcional pero algunos detalles son stub:
 - TC viene del payload (Banxico real en Sprint 6).
 - Watchdog de huérfanos: TODO (Sprint 6).
-- Idempotency key: TODO (Sprint 2).
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
@@ -142,6 +143,22 @@ def _agent_result_to_dto(name: str, item: AgentResult | AgentError | None) -> Ag
     )
 
 
+def compute_idempotency_hash(user_id: UUID, payload: dict) -> str:
+    """SHA-256 de user_id + payload serializado. Determinístico."""
+    canonical = json.dumps(
+        {"user_id": str(user_id), **payload},
+        sort_keys=True,
+        default=str,
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+class DuplicateEvaluationError(Exception):
+    def __init__(self, hash_value: str):
+        self.hash_value = hash_value
+        super().__init__(f"Evaluación duplicada (hash={hash_value[:12]}…)")
+
+
 class EvaluationService:
     """Orquesta el ciclo de vida de una evaluación.
 
@@ -165,8 +182,24 @@ class EvaluationService:
         self, req: CreateEvaluationRequest, db: AsyncSession
     ) -> EvaluationCreated:
         """Inserta Evaluation + EvaluationInput. Retorna 202 payload."""
+        idem_hash = compute_idempotency_hash(
+            self._user_id, req.model_dump(mode="json")
+        )
+
+        # Check duplicado en ventana 30s
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=30)
+        existing = await db.execute(
+            select(Evaluation).where(
+                Evaluation.idempotency_hash == idem_hash,
+                Evaluation.created_at >= cutoff,
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            raise DuplicateEvaluationError(idem_hash)
+
         eval_id = uuid4()
         eval_row, inputs_row = _eval_row_from_request(req, self._user_id, eval_id)
+        eval_row.idempotency_hash = idem_hash
         db.add(eval_row)
         db.add(inputs_row)
         await db.flush()
@@ -259,6 +292,8 @@ class EvaluationService:
             ev.final_verdict = verdict.veredicto
             ev.final_score = verdict.score_final
             ev.final_summary = verdict.justificacion
+            ev.warn_flags = list(verdict.warn_flags)
+            ev.requires_human_review = verdict.requires_human_review
         ev.updated_at = datetime.now(timezone.utc)
         await session.commit()
 
@@ -321,8 +356,8 @@ class EvaluationService:
             final_score=ev.final_score,
             final_summary=ev.final_summary,
             error_message=ev.error_message,
-            warn_flags=[],  # TODO Sprint 2: persistir en una columna JSON
-            requires_human_review=False,  # TODO Sprint 2 idem
+            warn_flags=ev.warn_flags or [],
+            requires_human_review=ev.requires_human_review or False,
             progress=progress,
             agent_results=dtos,
             created_at=ev.created_at,
