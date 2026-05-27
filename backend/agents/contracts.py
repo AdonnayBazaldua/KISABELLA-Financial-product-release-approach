@@ -127,6 +127,18 @@ class FinalVerdict(BaseModel):
     warn_flags: list[str] = Field(default_factory=list)
 
 
+class OrchestratorSynthesis(BaseModel):
+    """Output del LLM call del orquestador. Solo justificacion rica."""
+
+    model_config = ConfigDict(frozen=True)
+
+    justificacion: str = Field(
+        min_length=100,
+        max_length=8000,
+        description="Sintesis ejecutiva en espanol, 100-800 palabras",
+    )
+
+
 class TCMetadata(BaseModel):
     """Metadata del TC usado en la evaluación (ADR-005)."""
 
