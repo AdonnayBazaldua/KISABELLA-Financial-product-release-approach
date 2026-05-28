@@ -1,20 +1,13 @@
-"""Agente Orquestador (Sprint 1: determinístico).
+"""Agente Orquestador — sintesis ejecutiva con LLM (Sprint 3).
 
-Sintetiza los 4 AgentResult y emite FinalVerdict. Sin score propio.
-Sprint 3 agrega LLM call para justificación más rica;
-por ahora la justificación se compone con los análisis recibidos.
-
-Reglas:
-- Score: weighted_final_score (determinístico, ADR-013).
-- Veredicto:
-    ≤1 OK → no_viable + requires_human_review
-    2 OK  → viable_con_ajustes + requires_human_review
-    ≥3 OK → verdict_from_score
-- Confidence: high si 4 OK, medium si 3 OK, low si ≤2.
+Score y veredicto son SIEMPRE deterministicos (weighted_final_score + verdict_from_score).
+El LLM solo genera la justificacion rica cuando >=3 agentes OK.
+Fallback: si el LLM falla, se usa la justificacion mecanica.
 """
 
 from __future__ import annotations
 
+from agents.base import load_prompt
 from agents.calculations.scoring import (
     count_ok,
     degraded_verdict,
@@ -24,25 +17,27 @@ from agents.calculations.scoring import (
 from agents.contracts import (
     AgentError,
     AgentResult,
-    Confidence,
     FinalVerdict,
+    OrchestratorSynthesis,
     PipelineState,
     SpecialistName,
 )
+from agents.llm_client import LLMClient
+
+_PROMPT = load_prompt("orchestrator")
 
 
 def _short_summary(name: str, item: AgentResult | AgentError) -> str:
     if isinstance(item, AgentResult):
         return f"[{name} — score {item.score}] {item.veredicto_corto}"
-    return f"[{name} — falló: {item.error_type}] {item.error_message[:120]}"
+    return f"[{name} — fallo: {item.error_type}] {item.error_message[:120]}"
 
 
-def _build_justification(
+def _build_mechanical_justification(
     results: dict[SpecialistName, AgentResult | AgentError],
     score: int,
     verdict: str,
 ) -> str:
-    """Compone justificación concatenando los 4 análisis. Sprint 3 lo refina con LLM."""
     lines = [
         f"Veredicto integrado: {verdict} (score compuesto {score}/100).",
         f"Agentes evaluados: {count_ok(results)} de {len(results)} OK.",
@@ -54,27 +49,83 @@ def _build_justification(
             lines.append(f"- {_short_summary(name, results[name])}")
         else:
             lines.append(f"- [{name}] no ejecutado")
-    return "\n".join(lines)
+    text = "\n".join(lines)
+    if len(text) < 100:
+        text = text + " " * (100 - len(text))
+    return text
 
 
-def synthesize_verdict(state: PipelineState) -> FinalVerdict:
-    """Función pura: recibe state, retorna FinalVerdict."""
+def _build_agent_analyses_block(
+    results: dict[SpecialistName, AgentResult | AgentError],
+) -> str:
+    blocks = []
+    for name in ("financiero", "mercado", "riesgo", "estrategia"):
+        item = results.get(name)
+        if isinstance(item, AgentResult):
+            blocks.append(
+                f"--- AGENTE {name.upper()} (score {item.score}/100) ---\n"
+                f"Veredicto: {item.veredicto_corto}\n"
+                f"Analisis:\n{item.analisis_extenso}\n"
+                f"Hallazgos: {', '.join(item.hallazgos_clave)}\n"
+                f"Recomendaciones: {', '.join(item.recomendaciones)}"
+            )
+        elif isinstance(item, AgentError):
+            blocks.append(
+                f"--- AGENTE {name.upper()} (FALLO: {item.error_type}) ---\n"
+                f"{item.error_message[:200]}"
+            )
+        else:
+            blocks.append(f"--- AGENTE {name.upper()} (NO EJECUTADO) ---")
+    return "\n\n".join(blocks)
+
+
+async def _llm_justification(
+    results: dict[SpecialistName, AgentResult | AgentError],
+    score: int,
+    verdict: str,
+    ok_count: int,
+    llm: LLMClient,
+) -> str | None:
+    try:
+        analyses = _build_agent_analyses_block(results)
+        user_msg = _PROMPT.user_template.format(
+            verdict=verdict,
+            score=score,
+            ok_count=ok_count,
+            total_count=len(results),
+            agent_analyses=analyses,
+        )
+        synthesis = await llm.request_structured(
+            system=_PROMPT.system,
+            user=user_msg,
+            schema=OrchestratorSynthesis,
+        )
+        return synthesis.justificacion
+    except Exception:
+        return None
+
+
+async def synthesize_verdict(
+    state: PipelineState, llm: LLMClient
+) -> FinalVerdict:
     results = state.get("agent_results", {})
     score = weighted_final_score(results)
     ok = count_ok(results)
 
     if ok <= 2:
         verdict, rhr, confidence = degraded_verdict(results, score)
+        justification = _build_mechanical_justification(results, score, verdict)
     else:
         verdict = verdict_from_score(score)
         rhr = False
         confidence = "high" if ok == 4 else "medium"
 
-    justification = _build_justification(results, score, verdict)
-
-    # Padding mínimo: justificación debe tener 100+ chars
-    if len(justification) < 100:
-        justification = justification + " " * (100 - len(justification))
+        llm_just = await _llm_justification(results, score, verdict, ok, llm)
+        justification = (
+            llm_just
+            if llm_just and len(llm_just) >= 100
+            else _build_mechanical_justification(results, score, verdict)
+        )
 
     return FinalVerdict(
         veredicto=verdict,
@@ -86,6 +137,9 @@ def synthesize_verdict(state: PipelineState) -> FinalVerdict:
     )
 
 
-def orchestrator_node(state: PipelineState) -> dict:
-    """Nodo LangGraph del orquestador. Retorna parcial del state."""
-    return {"final_verdict": synthesize_verdict(state)}
+def build_orchestrator_node(llm: LLMClient):
+    async def _node(state: PipelineState) -> dict:
+        return {"final_verdict": await synthesize_verdict(state, llm)}
+
+    _node.__name__ = "orchestrator_node"
+    return _node
