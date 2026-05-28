@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { api } from "@/lib/api";
-import { FinancialResult } from "@/components/financial-result";
+import { Scorecard } from "@/components/scorecard";
 import Link from "next/link";
 
 export default async function EvaluationPage({ params }: { params: { id: string } }) {
@@ -18,7 +18,7 @@ export default async function EvaluationPage({ params }: { params: { id: string 
           ← Volver al dashboard
         </Link>
       </div>
-      <FinancialResult evaluation={evaluation} />
+      <Scorecard evaluation={evaluation} />
     </div>
   );
 }
