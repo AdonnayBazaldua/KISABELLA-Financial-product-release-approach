@@ -8,6 +8,7 @@ from agents.contracts import (
     AgentResult,
     EvaluationInputs,
     FinalVerdict,
+    OrchestratorSynthesis,
     TCMetadata,
 )
 from agents.llm_client import FakeLLMClient
@@ -24,6 +25,10 @@ def _make_agent_result(score: int = 75) -> AgentResult:
         hallazgos_clave=["hallazgo de prueba"],
         recomendaciones=["recomendacion de prueba"],
     )
+
+
+def _make_synthesis() -> OrchestratorSynthesis:
+    return OrchestratorSynthesis(justificacion="S" * 150)
 
 
 def _inputs_from_fixture(fixture: dict) -> EvaluationInputs:
@@ -52,7 +57,7 @@ async def test_golden_pipeline(fixture):
     llm = FakeLLMClient()
     # Queue 4 responses — una por agente (financiero ignora el score via calc override).
     # Orden de ejecución paralela no garantizado, pero los 4 agentes hacen 1 call cada uno.
-    llm.queue_responses([_make_agent_result(score=75) for _ in range(4)])
+    llm.queue_responses([_make_agent_result(score=75) for _ in range(4)] + [_make_synthesis()])
 
     inputs = _inputs_from_fixture(fixture)
 

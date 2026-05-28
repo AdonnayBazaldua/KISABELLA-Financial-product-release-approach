@@ -28,7 +28,7 @@ from agents.contracts import (
 from agents.financial import financial_agent
 from agents.llm_client import BudgetedLLMClient, LLMClient
 from agents.market import market_agent
-from agents.orchestrator import orchestrator_node
+from agents.orchestrator import build_orchestrator_node
 from agents.risk import risk_agent
 from agents.strategy import strategy_agent
 
@@ -87,7 +87,7 @@ def build_pipeline(llm: LLMClient):
         g.add_edge(START, name)
         g.add_edge(name, "orquestador")
 
-    g.add_node("orquestador", orchestrator_node)
+    g.add_node("orquestador", build_orchestrator_node(llm))
     g.add_edge("orquestador", END)
 
     return g.compile()

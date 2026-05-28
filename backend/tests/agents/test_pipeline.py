@@ -9,6 +9,7 @@ from agents.contracts import (
     AgentError,
     AgentResult,
     EvaluationInputs,
+    OrchestratorSynthesis,
     TCMetadata,
 )
 from agents.llm_client import FakeLLMClient
@@ -57,16 +58,21 @@ def _agent_result(score: int = 75) -> AgentResult:
     )
 
 
+def _orchestrator_synthesis() -> OrchestratorSynthesis:
+    return OrchestratorSynthesis(justificacion="S" * 150)
+
+
 class TestPipelineE2EAllOK:
     async def test_all_four_agents_run_in_parallel(self):
         fake = FakeLLMClient()
-        # 4 respuestas en cola para los 4 agentes
+        # 4 respuestas para agentes + 1 OrchestratorSynthesis para el orquestador
         fake.queue_responses(
             [
                 _agent_result(score=10),  # financiero LLM (sobrescrito por calc)
                 _agent_result(score=80),  # mercado
                 _agent_result(score=75),  # riesgo
                 _agent_result(score=70),  # estrategia
+                _orchestrator_synthesis(),  # orquestador LLM call
             ]
         )
 
@@ -88,6 +94,7 @@ class TestPipelineE2EAllOK:
         # Caso "excelente" → score_from_calculations = 100
         fake.queue_responses(
             [_agent_result(score=10) for _ in range(4)]  # LLM scores irrelevantes
+            + [_orchestrator_synthesis()]
         )
 
         final_state = await run_evaluation(_make_inputs(), _make_tc(), fake)
@@ -104,6 +111,7 @@ class TestPipelineE2EAllOK:
                 _agent_result(score=88),  # mercado
                 _agent_result(score=66),  # riesgo
                 _agent_result(score=44),  # estrategia
+                _orchestrator_synthesis(),  # orquestador LLM call
             ]
         )
 
@@ -119,7 +127,10 @@ class TestPipelineE2EAllOK:
 
     async def test_final_verdict_emitted(self):
         fake = FakeLLMClient()
-        fake.queue_responses([_agent_result(score=80) for _ in range(4)])
+        fake.queue_responses(
+            [_agent_result(score=80) for _ in range(4)]
+            + [_orchestrator_synthesis()]
+        )
 
         final_state = await run_evaluation(_make_inputs(), _make_tc(), fake)
         verdict = final_state["final_verdict"]
@@ -134,7 +145,7 @@ class TestPipelineDegradation:
         from unittest.mock import MagicMock
 
         fake = FakeLLMClient()
-        # 4 calls: 3 succeed, uno falla con excepción
+        # 4 calls: 3 succeed, uno falla con excepción + 1 synthesis (3 OK triggers LLM)
         fake.queue_responses(
             [
                 _agent_result(score=80),
@@ -145,6 +156,7 @@ class TestPipelineDegradation:
         fake.queue_exception(
             RateLimitError("simulated", response=MagicMock(), body=None)
         )
+        fake.queue_responses([_orchestrator_synthesis()])
 
         final_state = await run_evaluation(_make_inputs(), _make_tc(), fake)
 
