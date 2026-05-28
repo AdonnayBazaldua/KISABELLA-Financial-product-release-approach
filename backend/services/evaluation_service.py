@@ -364,6 +364,25 @@ class EvaluationService:
             updated_at=ev.updated_at,
         )
 
+    async def compare(
+        self, ids: list[UUID], db: AsyncSession
+    ) -> list[EvaluationDetail]:
+        """Retorna 2-3 evaluaciones completas para comparación lado a lado."""
+        if len(ids) < 2 or len(ids) > 3:
+            raise ValueError("Se requieren 2-3 evaluaciones para comparar")
+
+        results = []
+        for eval_id in ids:
+            detail = await self.get_detail(eval_id, db)
+            if detail is None:
+                raise KeyError(f"Evaluacion {eval_id} no encontrada")
+            if detail.status != "complete":
+                raise ValueError(
+                    f"Evaluacion {eval_id} no esta completa (status: {detail.status})"
+                )
+            results.append(detail)
+        return results
+
     async def list_evaluations(
         self, db: AsyncSession, *, limit: int = 20, offset: int = 0
     ) -> list[EvaluationSummary]:
