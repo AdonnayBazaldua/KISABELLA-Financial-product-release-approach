@@ -89,4 +89,9 @@ export const api = {
     // TODO Sprint 6: GET /api/v1/exchange-rate (Banxico con cache)
     return { rate: 19.85, source: "fallback" };
   },
+
+  compareEvaluations: (ids: string[]) =>
+    apiFetch<EvaluationDetail[]>(
+      `/api/v1/evaluations/compare?ids=${ids.join(",")}`
+    ),
 };

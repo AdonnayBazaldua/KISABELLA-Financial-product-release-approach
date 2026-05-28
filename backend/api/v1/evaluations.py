@@ -100,6 +100,29 @@ async def create_evaluation(
 
 
 @router.get(
+    "/evaluations/compare",
+    response_model=list[EvaluationDetail],
+)
+async def compare_evaluations(
+    ids: str,
+    db: AsyncSession = Depends(get_db),
+    service: EvaluationService = Depends(get_eval_service),
+) -> list[EvaluationDetail]:
+    """Retorna 2-3 evaluaciones completas para comparacion lado a lado."""
+    try:
+        id_list = [UUID(i.strip()) for i in ids.split(",") if i.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="IDs invalidos")
+
+    try:
+        return await service.compare(id_list, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get(
     "/evaluations/{eval_id}",
     response_model=EvaluationDetail,
 )
