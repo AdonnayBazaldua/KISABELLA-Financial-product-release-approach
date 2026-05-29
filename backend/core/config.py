@@ -57,6 +57,17 @@ class Settings(BaseSettings):
     # --- Observabilidad ---
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
+    # --- Chat + uploads (Sprint 5) ---
+    upload_root: str = "/data/uploads"
+    max_file_size_bytes: int = 5 * 1024 * 1024
+    max_files_per_message: int = 3
+    max_messages_per_conversation: int = 60
+    chat_max_input_tokens: int = 60_000
+    chat_max_output_tokens: int = 2_000
+    chat_temperature: float = 0.4
+    chat_history_soft_warn_at: int = 24
+    markitdown_timeout_s: int = 20
+
     @field_validator("secret_key")
     @classmethod
     def _secret_key_min_length(cls, v: SecretStr) -> SecretStr:

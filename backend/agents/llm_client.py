@@ -18,6 +18,7 @@ Prompt caching: TODO Sprint 6 (cache_control en system block).
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Protocol, TypeVar
@@ -56,6 +57,15 @@ class LLMClient(Protocol):
         temperature: float | None = None,
     ) -> T:
         """Llama al LLM y retorna el output validado contra `schema`."""
+        ...
+
+    async def stream_text(
+        self,
+        messages: list,
+        temperature: float = 0.4,
+        max_tokens: int = 2000,
+    ) -> AsyncIterator[str]:
+        """Emite tokens de texto. Sin structured output. ADR-017."""
         ...
 
 
@@ -105,6 +115,24 @@ class AnthropicLLMClient:
         messages = [SystemMessage(content=system), HumanMessage(content=user)]
         return await structured.ainvoke(messages)  # type: ignore[return-value]
 
+    async def stream_text(
+        self,
+        messages: list,
+        temperature: float = 0.4,
+        max_tokens: int = 2000,
+    ) -> AsyncIterator[str]:
+        llm = ChatAnthropic(
+            model=self._settings.anthropic_model,
+            api_key=self._settings.anthropic_api_key.get_secret_value(),
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=DEFAULT_TIMEOUT_S,
+            max_retries=0,
+        )
+        async for chunk in llm.astream(messages):
+            if chunk.content and isinstance(chunk.content, str):
+                yield chunk.content
+
 
 @dataclass
 class FakeCall:
@@ -136,6 +164,8 @@ class FakeLLMClient:
         self.calls: list[FakeCall] = []
         self._queue: deque[BaseModel | Exception] = deque()
         self._by_schema: dict[type[BaseModel], BaseModel] = {}
+        self._stream_tokens: list[str] = []
+        self._stream_error: Exception | None = None
 
     def set_response_for(self, schema: type[BaseModel], response: BaseModel) -> None:
         self._by_schema[schema] = response
@@ -169,6 +199,27 @@ class FakeLLMClient:
             f"FakeLLMClient: no response configurada para {schema.__name__}. "
             f"Llamadas hechas: {len(self.calls)}"
         )
+
+    def queue_stream(self, tokens: list[str]) -> None:
+        self._stream_tokens = list(tokens)
+
+    def queue_stream_error(self, error: Exception) -> None:
+        self._stream_error = error
+
+    async def stream_text(
+        self,
+        messages: list,
+        temperature: float = 0.4,
+        max_tokens: int = 2000,
+    ) -> AsyncIterator[str]:
+        if self._stream_error is not None:
+            err = self._stream_error
+            self._stream_error = None
+            raise err
+        tokens = list(self._stream_tokens)
+        self._stream_tokens = []
+        for token in tokens:
+            yield token
 
 
 class BudgetExhaustedError(Exception):
