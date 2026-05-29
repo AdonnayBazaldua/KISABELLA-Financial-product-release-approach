@@ -52,6 +52,17 @@ ALLOWED_MIMES: frozenset[str] = frozenset({
 
 IMAGE_MIMES: frozenset[str] = frozenset({"image/jpeg", "image/png", "image/webp"})
 
+_MIME_TO_EXT: dict[str, str] = {
+    "application/pdf": ".pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+    "text/csv": ".csv",
+    "text/plain": ".txt",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+
 TEXT_MIMES: frozenset[str] = frozenset({"text/csv", "text/plain"})
 
 
@@ -103,17 +114,19 @@ async def save_upload(
             f"(tamaño recibido: {len(data)} bytes)"
         )
 
-    # Detección por magic bytes — más confiable que el header declarado
+    # MIME detection: filetype reads magic bytes
     detected = filetype.guess(data)
     if detected is not None:
         mime = detected.mime
     elif declared_mime in TEXT_MIMES:
-        # filetype no detecta texto plano (sin magic bytes) — confiar en declaración
+        # filetype cannot detect plain text — trust declaration for text/* only
         mime = declared_mime
     else:
-        # Sin detección y sin tipo de texto conocido — usar declarado y dejar
-        # que la validación de ALLOWED_MIMES lo rechace si no está permitido.
-        mime = declared_mime
+        # Binary files MUST be identified by magic bytes
+        raise MimeNotAllowedError(
+            f"No se pudo verificar el tipo de archivo '{declared_mime}' por cabecera mágica. "
+            "Solo archivos de texto pueden omitir la detección automática."
+        )
 
     if mime not in ALLOWED_MIMES:
         raise MimeNotAllowedError(
@@ -122,7 +135,7 @@ async def save_upload(
         )
 
     sha = hashlib.sha256(data).hexdigest()
-    ext = Path(filename).suffix.lower() or ".bin"
+    ext = _MIME_TO_EXT.get(mime, ".bin")
 
     dest_dir = UPLOAD_ROOT / str(eval_id) / str(message_id)
     dest_dir.mkdir(parents=True, exist_ok=True)

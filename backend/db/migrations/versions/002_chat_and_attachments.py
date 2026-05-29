@@ -38,10 +38,11 @@ def upgrade() -> None:
     # ------------------------------------------------------------------ #
     # 2. Composite index on chat_messages(evaluation_id, created_at)
     # ------------------------------------------------------------------ #
-    op.execute("""
-        CREATE INDEX IF NOT EXISTS idx_chat_messages_eval_created
-        ON chat_messages (evaluation_id, created_at)
-    """)
+    op.create_index(
+        "idx_chat_messages_eval_created",
+        "chat_messages",
+        ["evaluation_id", "created_at"],
+    )
 
     # ------------------------------------------------------------------ #
     # 3. GRANT on chat_messages to capi_app (non-owner role, ADR-008)
@@ -75,7 +76,7 @@ def upgrade() -> None:
         ),
         sa.Column("original_name", sa.String(255), nullable=False),
         sa.Column("mime_type", sa.String(100), nullable=False),
-        sa.Column("size_bytes", sa.Integer, nullable=False),
+        sa.Column("size_bytes", sa.BigInteger, nullable=False),
         sa.Column("sha256", sa.String(64), nullable=False),
         sa.Column("storage_path", sa.Text, nullable=False),
         sa.Column("markdown_extracted", sa.Text, nullable=True),
@@ -106,13 +107,13 @@ def upgrade() -> None:
         USING (
             evaluation_id IN (
                 SELECT id FROM evaluations
-                WHERE created_by = current_setting('app.user_id')::uuid
+                WHERE created_by::text = current_setting('app.user_id', true)
             )
         )
         WITH CHECK (
             evaluation_id IN (
                 SELECT id FROM evaluations
-                WHERE created_by = current_setting('app.user_id')::uuid
+                WHERE created_by::text = current_setting('app.user_id', true)
             )
         )
     """)
@@ -128,7 +129,7 @@ def downgrade() -> None:
 
     # Revert chat_messages additions
     op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON chat_messages FROM capi_app")
-    op.execute("DROP INDEX IF EXISTS idx_chat_messages_eval_created")
+    op.drop_index("idx_chat_messages_eval_created", table_name="chat_messages")
     op.execute("ALTER TABLE chat_messages DROP COLUMN IF EXISTS updated_at")
     op.execute("ALTER TABLE chat_messages DROP COLUMN IF EXISTS error_msg")
     op.execute("ALTER TABLE chat_messages DROP COLUMN IF EXISTS status")
