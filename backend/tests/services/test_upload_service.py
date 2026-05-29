@@ -96,3 +96,20 @@ async def test_save_upload_text_file(tmp_path, monkeypatch):
     )
     assert "text/" in result.mime_type
     assert not result.is_image
+
+
+@pytest.mark.asyncio
+async def test_save_upload_undetectable_binary_with_text_mime(tmp_path, monkeypatch):
+    monkeypatch.setattr("services.upload_service.UPLOAD_ROOT", tmp_path)
+    # Binary with no recognizable magic bytes — filetype returns None
+    data = b"\x00\x01\x02\x03" * 20
+    result = await save_upload(
+        data=data,
+        filename="unknown.bin",
+        declared_mime="text/plain",
+        eval_id=uuid.uuid4(),
+        message_id=uuid.uuid4(),
+    )
+    assert result.mime_type == "text/plain"
+    assert not result.is_image
+    assert Path(result.storage_path).exists()

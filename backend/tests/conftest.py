@@ -29,12 +29,34 @@ def event_loop():
 
 @pytest_asyncio.fixture
 async def fake_session() -> AsyncGenerator[AsyncSession, None]:
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        echo=False,
+        # Needed for nested-transaction (savepoint) support in SQLite.
+        connect_args={"check_same_thread": False},
+    )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    maker = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+    # Use a persistent connection so the savepoint survives the session lifecycle.
+    conn = await engine.connect()
+    # Outer transaction — never committed; holds all test data.
+    await conn.begin()
+    # Savepoint — code under test may rollback/commit against this nested tx.
+    nested = await conn.begin_nested()
+
+    maker = async_sessionmaker(
+        bind=conn,
+        expire_on_commit=False,
+        class_=AsyncSession,
+        join_transaction_mode="create_savepoint",
+    )
     async with maker() as session:
         yield session
+
+    # Roll back everything — no data leaks between tests.
+    await conn.rollback()
+    await conn.close()
     await engine.dispose()
 
 
