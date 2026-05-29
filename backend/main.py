@@ -16,21 +16,51 @@ Endpoints:
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.v1.chat import router as chat_router
 from api.v1.evaluations import router as evaluations_router
 from core.config import get_settings
 from core.security import IPWhitelistMiddleware, SecurityHeadersMiddleware
 from db.session import dispose_engine
 
 
+async def _orphan_watchdog() -> None:
+    """Marks stuck streaming messages as error every 60s."""
+    from sqlalchemy import text as sql_text
+
+    from db.session import _ensure_engine
+
+    while True:
+        await asyncio.sleep(60)
+        try:
+            maker = _ensure_engine()
+            async with maker() as session:
+                await session.execute(
+                    sql_text("""
+                    UPDATE chat_messages
+                    SET status = 'error',
+                        error_msg = 'Tiempo de espera agotado (watchdog)',
+                        updated_at = NOW()
+                    WHERE role = 'assistant'
+                      AND status = 'streaming'
+                      AND created_at < NOW() - INTERVAL '3 minutes'
+                """)
+                )
+                await session.commit()
+        except Exception:
+            pass
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Startup: fuerza validación de settings ahora (no en primer request)
     get_settings()
+    asyncio.create_task(_orphan_watchdog())
     yield
     # Shutdown
     await dispose_engine()
@@ -64,5 +94,6 @@ def create_app() -> FastAPI:
         return {"status": "ok", "version": app.version}
 
     app.include_router(evaluations_router)
+    app.include_router(chat_router)
 
     return app
