@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
+import structlog
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
@@ -203,6 +205,11 @@ class EvaluationService:
         db.add(eval_row)
         db.add(inputs_row)
         await db.flush()
+        structlog.get_logger().info(
+            "evaluation_created",
+            evaluation_id=str(eval_id),
+            user_id=str(self._user_id),
+        )
         return EvaluationCreated(evaluation_id=eval_id, status="pending")
 
     async def run_pipeline(
@@ -220,6 +227,9 @@ class EvaluationService:
             fetched_at=datetime.now(timezone.utc),
         )
 
+        log = structlog.get_logger()
+        t0 = time.monotonic()
+        log.info("pipeline_start", evaluation_id=str(eval_id))
         try:
             async with self._session_factory() as session:
                 await self._mark_status(session, eval_id, "running")
@@ -230,6 +240,11 @@ class EvaluationService:
 
             async with self._session_factory() as session:
                 await self._persist_results(session, eval_id, final_state)
+            log.info(
+                "pipeline_complete",
+                evaluation_id=str(eval_id),
+                duration_ms=int((time.monotonic() - t0) * 1000),
+            )
         except Exception as exc:  # noqa: BLE001
             async with self._session_factory() as session:
                 await self._mark_error(session, eval_id, str(exc)[:1000])
@@ -249,6 +264,9 @@ class EvaluationService:
     async def _mark_error(
         self, session: AsyncSession, eval_id: UUID, msg: str
     ) -> None:
+        structlog.get_logger().error(
+            "pipeline_error", evaluation_id=str(eval_id), error=msg[:200]
+        )
         result = await session.execute(
             select(Evaluation).where(Evaluation.id == eval_id)
         )
