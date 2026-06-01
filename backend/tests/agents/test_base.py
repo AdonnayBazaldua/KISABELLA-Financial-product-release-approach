@@ -155,3 +155,68 @@ class TestRenderingNoneValues:
 
         user_msg = fake.calls[0].user
         assert "N/D" in user_msg
+
+
+@pytest.mark.asyncio
+async def test_build_agent_with_tool_fn_injects_results(fake_llm):
+    """tool_fn result aparece como {web_search_results} en el user message."""
+    from agents.base import build_agent
+    from agents.calculations.market import calculate_market
+    from agents.contracts import AgentResult
+    from tests.golden.fixtures import make_inputs
+
+    fake_llm.set_response_for(
+        AgentResult,
+        AgentResult(
+            score=70,
+            veredicto_corto="Mercado viable",
+            analisis_extenso="A" * 300,
+            hallazgos_clave=["h1"],
+            recomendaciones=["r1"],
+        ),
+    )
+
+    async def fake_tool(inputs) -> str:
+        return "Resultado de búsqueda: precio promedio $500 MXN"
+
+    agent = build_agent(
+        name="test_tool",
+        prompt_name="market",
+        calc_fn=calculate_market,
+        tool_fn=fake_tool,
+    )
+
+    result = await agent(make_inputs(), fake_llm)
+
+    assert result.score == 70
+    assert "Resultado de búsqueda" in fake_llm.calls[-1].user
+
+
+@pytest.mark.asyncio
+async def test_build_agent_without_tool_fn_has_default(fake_llm):
+    """Sin tool_fn, {web_search_results} = 'Sin resultados de búsqueda disponibles.'"""
+    from agents.base import build_agent
+    from agents.calculations.market import calculate_market
+    from agents.contracts import AgentResult
+    from tests.golden.fixtures import make_inputs
+
+    fake_llm.set_response_for(
+        AgentResult,
+        AgentResult(
+            score=60,
+            veredicto_corto="Mercado viable con ajustes",
+            analisis_extenso="B" * 300,
+            hallazgos_clave=["h1"],
+            recomendaciones=["r1"],
+        ),
+    )
+
+    agent = build_agent(
+        name="test_notool",
+        prompt_name="market",
+        calc_fn=calculate_market,
+    )
+
+    await agent(make_inputs(), fake_llm)
+
+    assert "Sin resultados de búsqueda disponibles." in fake_llm.calls[-1].user

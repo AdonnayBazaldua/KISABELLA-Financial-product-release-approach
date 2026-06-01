@@ -14,6 +14,7 @@ alembic>=1.13,<2.0
 
 # HTTP client (Banxico, Tavily)
 httpx==0.28.1
+tavily-python>=0.3,<0.4
 
 # LLM stack — ADR-007 langchain-anthropic, NO SDK anthropic directo
 langchain>=0.3.10,<0.4

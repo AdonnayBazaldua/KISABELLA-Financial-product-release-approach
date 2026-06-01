@@ -13,6 +13,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from agents.llm_client import FakeLLMClient
+from core.config import Settings, get_settings as _original_get_settings
 from db.models import Base
 
 
@@ -23,6 +24,41 @@ def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+
+# ---------- Settings (test configuration) ----------
+
+@pytest.fixture(autouse=True)
+def mock_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Patches get_settings globally so tools like banxico don't read a real .env.
+
+    Patches the canonical source (core.config) so it works for any tool module.
+    Tests with their own fake_settings can still call cache_clear() on
+    the original saved function.
+    """
+    from core import config as config_mod
+    from agents.tools import banxico as banxico_mod
+    from agents.tools import tavily as tavily_mod
+
+    fake_settings = Settings(
+        _env_file=None,
+        anthropic_api_key="test-key",
+        anthropic_model="claude-3-5-sonnet-20241022",
+        tavily_api_key="test-tavily",
+        banxico_token="test-banxico-token",
+        database_url="postgresql+asyncpg://test:test@localhost/test",
+        secret_key="test-secret-key-that-is-at-least-32-characters-long-yes!",
+        allowed_ips="127.0.0.1",
+        app_user_id="00000000-0000-0000-0000-000000000001",
+    )
+    # Clear the original cached function
+    _original_get_settings.cache_clear()
+    # Patch in core.config (canonical source) so all tools use it
+    monkeypatch.setattr(config_mod, "get_settings", lambda: fake_settings)
+    # Also patch in banxico and tavily modules (they import get_settings locally)
+    monkeypatch.setattr(banxico_mod, "get_settings", lambda: fake_settings)
+    monkeypatch.setattr(tavily_mod, "get_settings", lambda: fake_settings)
+    yield
 
 
 # ---------- DB in-memory (SQLite for tests) ----------

@@ -16,7 +16,7 @@ from api.v1.evaluations import (
     get_background_session_factory,
     get_user_id,
 )
-from core.config import Settings, get_settings
+from core.config import Settings, get_settings, get_settings as _original_get_settings
 from db.session import get_db
 
 
@@ -92,7 +92,7 @@ def fake_llm():
 @pytest.fixture
 def app(monkeypatch, fake_settings, fake_db_session, fake_llm):
     """App con dependency_overrides para todas las deps externas."""
-    config_module.get_settings.cache_clear()
+    _original_get_settings.cache_clear()
 
     async def _fake_dispose():
         return None

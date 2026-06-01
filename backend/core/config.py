@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     # --- Servicios externos ---
     tavily_api_key: SecretStr = Field(default=SecretStr(""))
     banxico_token: SecretStr = Field(default=SecretStr(""))
+    banxico_url: str = "https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos/oportuno"
 
     # --- Base de datos ---
     database_url: str

@@ -17,6 +17,7 @@ Prompt caching: TODO Sprint 6 (cache_control en system block).
 
 from __future__ import annotations
 
+import structlog
 from collections import deque
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
@@ -276,9 +277,17 @@ class BudgetedLLMClient:
 
         self._calls_used += 1
         self._tokens_used += estimated
-        return await self._inner.request_structured(
+        result = await self._inner.request_structured(
             system=system, user=user, schema=schema, temperature=temperature
         )
+        structlog.get_logger().info(
+            "llm_call",
+            schema=schema.__name__,
+            tokens_estimated=estimated,
+            calls_used=self._calls_used,
+            calls_max=self._max_calls,
+        )
+        return result
 
     @property
     def budget_summary(self) -> dict:

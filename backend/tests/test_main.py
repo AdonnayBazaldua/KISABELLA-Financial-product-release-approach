@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 import core.config as config_module
 import db.session as session_module
-from core.config import Settings
+from core.config import Settings, get_settings as _original_get_settings
 from core.security import (
     IPWhitelistMiddleware,
     SecurityHeadersMiddleware,
@@ -23,7 +23,7 @@ def fake_settings(monkeypatch):
         allowed_ips="127.0.0.1,10.0.0.5",
         next_public_api_url="http://localhost:3000",
     )
-    config_module.get_settings.cache_clear()
+    _original_get_settings.cache_clear()
     monkeypatch.setattr(config_module, "get_settings", lambda: s)
     # main.py importa get_settings via from core.config import get_settings
     import main as main_module
