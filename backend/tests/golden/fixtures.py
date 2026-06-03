@@ -7,7 +7,35 @@ Cada fixture es un dict con:
 - description: qué escenario representa
 """
 
+from datetime import datetime, timezone
 from decimal import Decimal
+
+from agents.contracts import EvaluationInputs
+
+
+def make_inputs(**overrides) -> EvaluationInputs:
+    """Crea un EvaluationInputs válido para tests. Permite sobrescribir campos."""
+    base = dict(
+        product_name="Producto Test",
+        category="fisico",
+        cost_purchase=Decimal("100.00"),
+        cost_freight=Decimal("10.00"),
+        cost_customs=Decimal("15.00"),
+        cost_storage=Decimal("0.00"),
+        cost_logistics_vehicle=Decimal("0.00"),
+        cost_logistics_viaticos=Decimal("0.00"),
+        cost_logistics_personnel=Decimal("0.00"),
+        cost_shrinkage_pct=Decimal("0.00"),
+        cost_commission_pct=Decimal("0.00"),
+        cost_marketing=Decimal("0.00"),
+        cost_overhead=Decimal("0.00"),
+        target_price=Decimal("200.00"),
+        estimated_units_month=100,
+        exchange_rate_used=Decimal("19.8500"),
+        exchange_rate_at=datetime(2026, 5, 25, tzinfo=timezone.utc),
+    )
+    base.update(overrides)
+    return EvaluationInputs(**base)
 
 GOLDEN_FIXTURES = [
     {

@@ -12,7 +12,10 @@ Timeouts (ADR del workflow tree):
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any
+
+import structlog
 
 from langgraph.graph import END, START, StateGraph
 
@@ -45,15 +48,30 @@ AGENTS: dict[SpecialistName, AgentFn] = {
 def _wrap_agent_node(
     name: SpecialistName, agent_fn: AgentFn, llm: LLMClient
 ) -> Any:
-    """Wrap async agent_fn en nodo LangGraph con timeout + error handling."""
+    """Wrap async agent_fn en nodo LangGraph con timeout + error handling + logging."""
+    log = structlog.get_logger()
 
     async def _node(state: PipelineState) -> dict:
+        eval_id = str(state.get("eval_id", ""))
+        t0 = time.monotonic()
         try:
             result = await asyncio.wait_for(
                 agent_fn(state["inputs"], llm), timeout=AGENT_TIMEOUT_S
             )
+            log.info(
+                "agent_complete",
+                agent_name=name,
+                evaluation_id=eval_id,
+                duration_ms=int((time.monotonic() - t0) * 1000),
+            )
             return {"agent_results": {name: result}}
         except asyncio.TimeoutError:
+            log.warning(
+                "agent_timeout",
+                agent_name=name,
+                evaluation_id=eval_id,
+                timeout_s=AGENT_TIMEOUT_S,
+            )
             return {
                 "agent_results": {
                     name: AgentError(
@@ -64,6 +82,13 @@ def _wrap_agent_node(
                 }
             }
         except Exception as exc:  # noqa: BLE001
+            log.error(
+                "agent_error",
+                agent_name=name,
+                evaluation_id=eval_id,
+                error_type="unknown",
+                error_message=str(exc)[:200],
+            )
             return {
                 "agent_results": {
                     name: AgentError(

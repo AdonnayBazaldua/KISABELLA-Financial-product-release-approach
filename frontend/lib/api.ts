@@ -81,14 +81,11 @@ export const api = {
     apiFetch<EvaluationDetail>(`/api/v1/evaluations/${id}`),
 
   /**
-   * TC USD/MXN — Sprint 6 conecta Banxico real.
-   * Por ahora retorna fallback estable; el backend tampoco lo persiste
-   * desde Banxico aún. El form usa este valor como sugerencia editable.
+   * TC USD/MXN — conectado a Banxico con cache en backend.
+   * El form usa este valor como sugerencia editable.
    */
-  getExchangeRate: async (): Promise<{ rate: number; source: string }> => {
-    // TODO Sprint 6: GET /api/v1/exchange-rate (Banxico con cache)
-    return { rate: 19.85, source: "fallback" };
-  },
+  getExchangeRate: () =>
+    apiFetch<{ rate: number; source: string; date: string }>("/api/v1/tc"),
 
   compareEvaluations: (ids: string[]) =>
     apiFetch<EvaluationDetail[]>(

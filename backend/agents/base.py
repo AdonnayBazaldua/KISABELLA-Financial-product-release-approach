@@ -25,6 +25,7 @@ PROMPTS_DIR = Path(__file__).parent / "prompts"
 AgentFn = Callable[[EvaluationInputs, LLMClient], Awaitable[AgentResult]]
 CalcFn = Callable[[EvaluationInputs], Any]
 ScoreFn = Callable[[AgentResult, Any], int]
+ToolFn = Callable[[EvaluationInputs], Awaitable[str]]
 
 
 class PromptTemplates(BaseModel):
@@ -60,18 +61,16 @@ def load_prompt(name: str) -> PromptTemplates:
     )
 
 
-def _render_user(template: str, inputs: EvaluationInputs, calc: Any) -> str:
-    """Rinde user_template con valores de inputs (+ calc si existe).
-
-    Decimal y datetime se serializan a string via model_dump(mode="json").
-    Valores None se renderizan como 'N/D' para legibilidad.
-    """
+def _render_user(template: str, inputs: EvaluationInputs, calc: Any, tool_result: str = "") -> str:
+    """Rinde user_template con valores de inputs (+ calc + tool_result si existen)."""
     ctx: dict[str, Any] = inputs.model_dump(mode="json")
     if calc is not None and isinstance(calc, BaseModel):
         ctx.update(calc.model_dump(mode="json"))
 
-    # Reemplaza None por "N/D" para que el LLM no vea "None"
     safe_ctx = {k: ("N/D" if v is None else v) for k, v in ctx.items()}
+    safe_ctx["web_search_results"] = (
+        tool_result if tool_result else "Sin resultados de búsqueda disponibles."
+    )
 
     return template.format(**safe_ctx)
 
@@ -81,19 +80,20 @@ def build_agent(
     prompt_name: str,
     calc_fn: CalcFn | None = None,
     score_fn: ScoreFn | None = None,
+    tool_fn: ToolFn | None = None,
 ) -> AgentFn:
-    """Construye un AgentFn componiendo prompt + calc + score override.
+    """Construye un AgentFn componiendo prompt + calc + tool + score override.
 
-    - calc_fn(inputs) → cualquier Pydantic model con los pre-cálculos.
-      Sus campos se inyectan en el user_template junto con los inputs.
-    - score_fn(raw_result, calc) → score 0-100 que reemplaza el del LLM.
-      Si None, se usa el score que el LLM devolvió.
+    - calc_fn(inputs) → Pydantic model con pre-cálculos. Inyectado en user_template.
+    - tool_fn(inputs) → str. Inyectado como {web_search_results} en user_template.
+    - score_fn(raw_result, calc) → score 0-100. Reemplaza el score del LLM.
     """
     prompts = load_prompt(prompt_name)
 
     async def _agent(inputs: EvaluationInputs, llm: LLMClient) -> AgentResult:
         calc = calc_fn(inputs) if calc_fn else None
-        user_msg = _render_user(prompts.user_template, inputs, calc)
+        tool_result = await tool_fn(inputs) if tool_fn else ""
+        user_msg = _render_user(prompts.user_template, inputs, calc, tool_result)
 
         raw = await llm.request_structured(
             system=prompts.system,
