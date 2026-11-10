@@ -43,6 +43,8 @@ class Settings(BaseSettings):
 
     # --- Base de datos ---
     database_url: str
+    # Rol dueño (DDL) para Alembic. Si falta, se usa database_url.
+    migration_database_url: str | None = None
 
     # --- Seguridad ---
     secret_key: SecretStr
@@ -96,6 +98,11 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    @property
+    def migrations_url(self) -> str:
+        return self.migration_database_url or self.database_url
+
+
     """Singleton de Settings cacheado.
 
     Lazy: la primera llamada lee `.env` y valida. Si falta alguna var
