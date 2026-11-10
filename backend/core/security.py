@@ -72,6 +72,9 @@ class IPWhitelistMiddleware(BaseHTTPMiddleware):
         if request.url.path in self.HEALTH_PATHS:
             return await call_next(request)
 
+        if not self._allowed:
+            return await call_next(request)
+
         client = _client_ip(request)
         if client not in self._allowed:
             return JSONResponse(
