@@ -115,3 +115,13 @@ async def test_chat_turn_completes_under_rls_with_own_session(monkeypatch):
     llm.queue_stream(["resp ", "ok"])
     row = await _chat_turn(monkeypatch, llm)
     assert (row["status"], row["content"]) == ("complete", "resp ok")
+
+
+async def test_chat_turn_error_is_persisted_under_rls(monkeypatch):
+    """Tras el rollback del error se pierde el set_config transaccional: debe re-aplicarse."""
+    from agents.llm_client import FakeLLMClient
+
+    llm = FakeLLMClient()
+    llm.queue_stream_error(RuntimeError("boom"))
+    row = await _chat_turn(monkeypatch, llm)
+    assert row["status"] == "error"

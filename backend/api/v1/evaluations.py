@@ -14,7 +14,7 @@ from typing import AsyncContextManager, Callable
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agents.llm_client import LLMClient, get_llm_client
@@ -48,10 +48,14 @@ def get_background_session_factory(
     async def _factory():
         maker = _ensure_engine()
         async with maker() as session:
-            await session.execute(
-                text("SELECT set_config('app.user_id', :uid, true)"),
-                {"uid": settings.app_user_id},
-            )
+            # set_config es transaccional: commit/rollback lo pierden → re-aplicar en cada BEGIN.
+            @event.listens_for(session.sync_session, "after_begin")
+            def _set_rls_user(_s, _tx, conn):
+                conn.execute(
+                    text("SELECT set_config('app.user_id', :uid, true)"),
+                    {"uid": settings.app_user_id},
+                )
+
             try:
                 yield session
             except Exception:
