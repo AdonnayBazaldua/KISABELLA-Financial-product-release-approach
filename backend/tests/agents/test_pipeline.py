@@ -197,3 +197,25 @@ class TestPipelineBuildable:
         graph = build_pipeline(fake)
         # LangGraph CompiledGraph tiene ainvoke
         assert hasattr(graph, "ainvoke")
+
+
+class TestPipelineWebWarning:
+    """Seam 3: sin resultados de Tavily el veredicto lleva warn_no_web (CLAUDE.md, Timeouts)."""
+
+    async def _run(self, monkeypatch, web_result: str):
+        async def fake_search(*a, **kw):
+            return web_result
+
+        monkeypatch.setattr("agents.market.search_web", fake_search)
+        fake = FakeLLMClient()
+        fake.queue_responses([_agent_result()] * 4 + [_orchestrator_synthesis()])
+        state = await run_evaluation(_make_inputs(), _make_tc(), fake)
+        return state["final_verdict"]
+
+    async def test_no_web_results_flags_warn_no_web(self, monkeypatch):
+        verdict = await self._run(monkeypatch, "")
+        assert "warn_no_web" in verdict.warn_flags
+
+    async def test_web_results_present_no_flag(self, monkeypatch):
+        verdict = await self._run(monkeypatch, "## resultados de búsqueda")
+        assert "warn_no_web" not in verdict.warn_flags

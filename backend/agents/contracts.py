@@ -93,6 +93,12 @@ class AgentResult(BaseModel):
     hallazgos_clave: list[str] = Field(min_length=1, max_length=10)
     recomendaciones: list[str] = Field(min_length=1, max_length=10)
 
+    # Lo rellena el sistema (p. ej. warn_no_web), nunca el modelo.
+    warn_flags: list[str] = Field(
+        default_factory=list,
+        description="Uso interno del sistema. Déjalo siempre vacío.",
+    )
+
 
 class AgentError(BaseModel):
     """Falla parcial de un agente.

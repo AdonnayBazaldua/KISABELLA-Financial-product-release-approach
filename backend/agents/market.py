@@ -16,4 +16,5 @@ market_agent = build_agent(
     prompt_name="market",
     calc_fn=calculate_market,
     tool_fn=_market_tool,
+    empty_tool_flag="warn_no_web",
 )

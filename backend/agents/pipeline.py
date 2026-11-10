@@ -64,7 +64,7 @@ def _wrap_agent_node(
                 evaluation_id=eval_id,
                 duration_ms=int((time.monotonic() - t0) * 1000),
             )
-            return {"agent_results": {name: result}}
+            return {"agent_results": {name: result}, "warn_flags": result.warn_flags}
         except asyncio.TimeoutError:
             log.warning(
                 "agent_timeout",
