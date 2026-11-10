@@ -238,7 +238,7 @@ class BudgetExhaustedError(Exception):
 class BudgetedLLMClient:
     """Wrapper that enforces per-evaluation hard caps on LLM usage.
 
-    Caps (from CLAUDE.md):
+    Caps:
     - max_calls: 6 (4 agents + margin for retries)
     - max_input_tokens: 20,000
     """

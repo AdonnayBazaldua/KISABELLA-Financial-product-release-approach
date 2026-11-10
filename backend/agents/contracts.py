@@ -74,7 +74,7 @@ class AgentResult(BaseModel):
     """Output estructurado de un agente especialista.
 
     Validado por ChatAnthropic.with_structured_output(AgentResult).
-    Constraints reflejan las convenciones de CLAUDE.md:
+    Constraints reflejan las convenciones del proyecto:
     - score entero 0-100
     - veredicto_corto: 1 línea descriptiva
     - analisis_extenso: ~300-500 palabras (chequeado por longitud de string)

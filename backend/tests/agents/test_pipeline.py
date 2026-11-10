@@ -200,7 +200,7 @@ class TestPipelineBuildable:
 
 
 class TestPipelineWebWarning:
-    """Seam 3: sin resultados de Tavily el veredicto lleva warn_no_web (CLAUDE.md, Timeouts)."""
+    """Seam 3: sin resultados de Tavily el veredicto lleva warn_no_web."""
 
     async def _run(self, monkeypatch, web_result: str):
         async def fake_search(*a, **kw):

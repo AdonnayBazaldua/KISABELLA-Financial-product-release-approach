@@ -110,7 +110,7 @@ scripts/test-rls.sh
 scripts/smoke.sh
 ```
 
-Agents are plain async functions assembled by `build_agent()` (`backend/agents/`); prompts are Markdown files in `backend/agents/prompts/` that you can edit without touching Python. Domain glossary: [`CONTEXT.md`](CONTEXT.md).
+Agents are plain async functions assembled by `build_agent()` (`backend/agents/`); prompts are Markdown files in `backend/agents/prompts/` that you can edit without touching Python. Design decisions: [`docs/adr/`](docs/adr/).
 
 ## Known limitations
 
