@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     # --- Frontend / red interna Docker ---
     api_url_internal: str = "http://backend:8000"
     next_public_api_url: str = "http://localhost:8000"
+    # Origen del navegador permitido por CORS (el frontend, no la API).
+    frontend_origin: str = "http://localhost:3000"
 
     # --- Observabilidad ---
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"

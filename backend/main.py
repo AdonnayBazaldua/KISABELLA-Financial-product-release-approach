@@ -167,7 +167,7 @@ def create_app() -> FastAPI:
     app.add_middleware(IPWhitelistMiddleware, allowed_ips=settings.allowed_ips)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.next_public_api_url],
+        allow_origins=[settings.frontend_origin],
         allow_credentials=False,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Request-Id"],

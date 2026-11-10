@@ -21,7 +21,7 @@ def fake_settings(monkeypatch):
         database_url="postgresql+psycopg://capi_app:pw@db:5432/test",
         secret_key="x" * 32,
         allowed_ips="127.0.0.1,10.0.0.5",
-        next_public_api_url="http://localhost:3000",
+        frontend_origin="http://localhost:3000",
     )
     _original_get_settings.cache_clear()
     monkeypatch.setattr(config_module, "get_settings", lambda: s)
