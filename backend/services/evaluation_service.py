@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from decimal import Decimal
 import structlog
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
@@ -25,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from agents.contracts import (
+    TCSource,
     AgentError,
     AgentResult,
     EvaluationInputs,
@@ -47,7 +49,27 @@ if TYPE_CHECKING:
     SessionFactory = Callable[[], AsyncSession]
 
 
-def _inputs_from_request(req: CreateEvaluationRequest) -> EvaluationInputs:
+TC_TOLERANCE = Decimal("0.005")  # ±0.5 % cuenta como "es el TC de Banxico"
+
+
+def resolve_tc(
+    payload_rate: Decimal, banxico: tuple[Decimal, str] | None
+) -> tuple[TCSource, list[str]]:
+    """ADR-005: el TC del usuario se respeta, pero su procedencia se etiqueta honesto.
+
+    banxico = (rate, "banxico" | "fallback") de get_usd_mxn(), o None si no hay ningún valor.
+    """
+    if banxico is None:
+        return "user_provided", ["warn_fx"]
+    rate, kind = banxico
+    if abs(payload_rate - rate) / rate > TC_TOLERANCE:
+        return "user_provided", ["warn_fx"]
+    return ("banxico", []) if kind == "banxico" else ("fallback_db", ["warn_fx"])
+
+
+def _inputs_from_request(
+    req: CreateEvaluationRequest, tc_source: TCSource = "user_provided"
+) -> EvaluationInputs:
     """Mapea HTTP request → EvaluationInputs interno del pipeline."""
     return EvaluationInputs(
         product_name=req.product_name,
