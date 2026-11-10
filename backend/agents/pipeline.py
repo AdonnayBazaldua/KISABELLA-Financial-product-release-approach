@@ -125,6 +125,7 @@ async def run_evaluation(
     *,
     eval_id=None,
     user_id=None,
+    warn_flags: list[str] | None = None,
 ) -> PipelineState:
     """Helper: corre el pipeline completo y retorna el state final."""
     budgeted = BudgetedLLMClient(llm)
@@ -133,7 +134,7 @@ async def run_evaluation(
         "inputs": inputs,
         "tc_meta": tc_meta,
         "agent_results": {},
-        "warn_flags": [],
+        "warn_flags": list(warn_flags or []),
     }
     if eval_id is not None:
         initial["eval_id"] = eval_id

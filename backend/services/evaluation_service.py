@@ -33,6 +33,7 @@ from agents.contracts import (
     TCMetadata,
 )
 from agents.llm_client import LLMClient
+from agents.tools.banxico import get_usd_mxn
 from agents.pipeline import AGENTS, run_evaluation
 from api.v1.schemas import (
     AgentResultDTO,
@@ -92,7 +93,7 @@ def _inputs_from_request(
         estimated_units_month=req.estimated_units_month,
         exchange_rate_used=req.exchange_rate_used,
         exchange_rate_at=datetime.now(timezone.utc),
-        tc_source="user_provided",
+        tc_source=tc_source,
     )
 
 
@@ -242,10 +243,15 @@ class EvaluationService:
         Abre su propia session (independiente de la del request, que ya cerró).
         Captura cualquier excepción y la persiste como error_message.
         """
-        inputs = _inputs_from_request(req)
+        try:
+            banxico = await get_usd_mxn()
+        except Exception:  # noqa: BLE001 — sin Banxico ni fallback: se sigue con el TC del usuario
+            banxico = None
+        tc_source, warn_flags = resolve_tc(req.exchange_rate_used, banxico)
+        inputs = _inputs_from_request(req, tc_source)
         tc_meta = TCMetadata(
             rate=req.exchange_rate_used,
-            source="user_provided",
+            source=tc_source,
             fetched_at=datetime.now(timezone.utc),
         )
 
@@ -257,7 +263,8 @@ class EvaluationService:
                 await self._mark_status(session, eval_id, "running")
 
             final_state = await run_evaluation(
-                inputs, tc_meta, self._llm, eval_id=eval_id, user_id=self._user_id
+                inputs, tc_meta, self._llm, eval_id=eval_id, user_id=self._user_id,
+                warn_flags=warn_flags,
             )
 
             async with self._session_factory() as session:
