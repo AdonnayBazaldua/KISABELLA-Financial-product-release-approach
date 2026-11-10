@@ -27,6 +27,7 @@ from agents.llm_client import LLMClient, get_llm_client
 from api.v1.chat_schemas import AttachmentDTO, ChatMessageCreated, ChatMessageDTO
 from core.config import get_settings
 from db.models import ChatAttachment, ChatMessage, Evaluation
+from api.v1.evaluations import get_background_session_factory
 from db.session import get_db
 from services.upload_service import FileTooLargeError, MimeNotAllowedError, save_upload
 
@@ -91,6 +92,7 @@ async def post_chat_message(
     files: list[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db),
     llm: LLMClient = Depends(get_llm_client),
+    session_factory=Depends(get_background_session_factory),
 ) -> ChatMessageCreated:
     """Crea un turno de chat para una evaluación completada.
 
@@ -212,12 +214,14 @@ async def post_chat_message(
     db.add(asst_msg)
     await db.flush()
 
+    # El task abre otra sesión: lo flusheado debe estar commiteado y visible para ella.
+    await db.commit()
     background.add_task(
         process_chat_turn,
         evaluation_id=eval_id,
         user_msg_id=user_msg.id,
         assistant_msg_id=asst_msg.id,
-        session=db,
+        session_factory=session_factory,
         llm=llm,
     )
 

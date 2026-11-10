@@ -71,3 +71,47 @@ async def test_cannot_insert_row_for_another_user():
         await conn.execute(
             "INSERT INTO evaluations (created_by, name) VALUES ($1, 'x')", uuid.UUID(U1)
         )
+
+
+async def _chat_turn(monkeypatch, llm):
+    from agents.chat import process_chat_turn
+    from api.v1.evaluations import get_background_session_factory
+    from core.config import Settings
+    import db.session as dbs
+
+    monkeypatch.setenv("DATABASE_URL", APP.replace("postgresql://", "postgresql+asyncpg://"))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
+    monkeypatch.setenv("SECRET_KEY", "x" * 32)
+    monkeypatch.setenv("APP_USER_ID", U1)
+    settings = Settings(_env_file=None)
+    monkeypatch.setattr(dbs, "get_settings", lambda: settings)  # conftest parchea con un fake
+    dbs._engine = dbs._session_maker = None
+
+    owner = await asyncpg.connect(OWNER)
+    eid = await owner.fetchval(
+        "INSERT INTO evaluations (created_by, name, status) VALUES ($1, 'chat', 'complete') RETURNING id",
+        uuid.UUID(U1),
+    )
+    umsg, amsg = [
+        await owner.fetchval(
+            "INSERT INTO chat_messages (evaluation_id, role, content, status) "
+            "VALUES ($1, $2, $3, $4) RETURNING id", eid, role, content, status)
+        for role, content, status in (("user", "hola", "complete"), ("assistant", "", "streaming"))
+    ]
+    await process_chat_turn(
+        evaluation_id=eid, user_msg_id=umsg, assistant_msg_id=amsg, llm=llm,
+        session_factory=get_background_session_factory(settings),
+    )
+    row = await owner.fetchrow("SELECT status, content FROM chat_messages WHERE id = $1", amsg)
+    await dbs.dispose_engine()
+    return row
+
+
+async def test_chat_turn_completes_under_rls_with_own_session(monkeypatch):
+    """Bug: el BackgroundTask del chat usaba la sesión (cerrada, sin RLS) del request."""
+    from agents.llm_client import FakeLLMClient
+
+    llm = FakeLLMClient()
+    llm.queue_stream(["resp ", "ok"])
+    row = await _chat_turn(monkeypatch, llm)
+    assert (row["status"], row["content"]) == ("complete", "resp ok")
