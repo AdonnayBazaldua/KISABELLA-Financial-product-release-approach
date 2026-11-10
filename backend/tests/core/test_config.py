@@ -9,7 +9,7 @@ from core.config import Settings
 def _valid_kwargs(**overrides):
     base = dict(
         anthropic_api_key="sk-ant-test-key",
-        database_url="postgresql+psycopg://capi_app:pw@db:5432/capi_test",
+        database_url="postgresql+psycopg://kisabella_app:pw@db:5432/kisabella_test",
         secret_key="x" * 32,
     )
     base.update(overrides)
@@ -110,3 +110,14 @@ class TestSettingsSecretLeakage:
     def test_anthropic_key_not_in_repr(self):
         s = Settings(_env_file=None, **_valid_kwargs())
         assert "sk-ant-test-key" not in repr(s)
+
+
+class TestMigrationsUrl:
+    def test_falls_back_to_database_url(self):
+        s = Settings(_env_file=None, **_valid_kwargs())
+        assert s.migrations_url == s.database_url
+
+    def test_prefers_migration_database_url_when_set(self):
+        owner = "postgresql+asyncpg://kisabella:pw@db:5432/kisabella"
+        s = Settings(_env_file=None, **_valid_kwargs(migration_database_url=owner))
+        assert s.migrations_url == owner
