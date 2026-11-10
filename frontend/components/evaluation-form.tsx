@@ -136,9 +136,9 @@ export function EvaluationForm() {
         className="w-full h-12 text-base font-semibold bg-slate-900 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
       >
         {loading ? (
-          <><Loader2 size={18} className="animate-spin" /> Analizando con CAPI...</>
+          <><Loader2 size={18} className="animate-spin" /> Analizando...</>
         ) : (
-          "Analizar con CAPI"
+          "Analizar"
         )}
       </button>
     </form>

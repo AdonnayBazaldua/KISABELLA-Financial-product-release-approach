@@ -1,4 +1,4 @@
-"""Contratos Pydantic del dominio CAPI-KISABELLA.
+"""Contratos Pydantic del dominio Kisabella Financial Product Release.
 
 Estos modelos son la fuente de verdad sobre las shapes que viajan por el pipeline.
 

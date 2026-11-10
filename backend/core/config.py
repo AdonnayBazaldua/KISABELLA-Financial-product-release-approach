@@ -1,4 +1,4 @@
-"""Settings tipados de CAPI-KISABELLA.
+"""Settings tipados de Kisabella Financial Product Release.
 
 Validación estricta al startup: si falta una variable required o tiene
 formato inválido, el proceso falla rápido con ValidationError.
@@ -98,13 +98,13 @@ class Settings(BaseSettings):
         return v
 
 
-@lru_cache(maxsize=1)
-def get_settings() -> Settings:
     @property
     def migrations_url(self) -> str:
         return self.migration_database_url or self.database_url
 
 
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
     """Singleton de Settings cacheado.
 
     Lazy: la primera llamada lee `.env` y valida. Si falta alguna var

@@ -32,7 +32,7 @@ def _patch_settings(monkeypatch):
     fake_settings = Settings(
         _env_file=None,
         anthropic_api_key="sk-ant-test",
-        database_url="postgresql+psycopg://capi_app:pw@db:5432/test",
+        database_url="postgresql+psycopg://kisabella_app:pw@db:5432/test",
         secret_key="x" * 32,
     )
     monkeypatch.setattr(

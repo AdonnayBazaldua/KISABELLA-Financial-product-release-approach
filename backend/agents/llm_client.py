@@ -1,4 +1,4 @@
-"""LLM client wrapper para CAPI-KISABELLA.
+"""LLM client wrapper para Kisabella Financial Product Release.
 
 ADR-007: langchain-anthropic + with_structured_output.
 ADR-003: validación de outputs LLM con Pydantic acá, no en cada agente.

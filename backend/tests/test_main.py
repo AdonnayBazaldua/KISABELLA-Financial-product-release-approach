@@ -18,7 +18,7 @@ def fake_settings(monkeypatch):
     s = Settings(
         _env_file=None,
         anthropic_api_key="sk-ant-test",
-        database_url="postgresql+psycopg://capi_app:pw@db:5432/test",
+        database_url="postgresql+psycopg://kisabella_app:pw@db:5432/test",
         secret_key="x" * 32,
         allowed_ips="127.0.0.1,10.0.0.5",
         frontend_origin="http://localhost:3000",

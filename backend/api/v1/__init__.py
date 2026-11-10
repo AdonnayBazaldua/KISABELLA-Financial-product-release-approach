@@ -1,1 +1,1 @@
-"""API v1 — rutas versionadas para CAPI-KISABELLA."""
+"""API v1 — rutas versionadas para Kisabella Financial Product Release."""
