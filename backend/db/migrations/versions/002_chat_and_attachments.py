@@ -7,7 +7,7 @@ Create Date: 2026-05-29
 Cambios:
 - ADD COLUMN IF NOT EXISTS en chat_messages: status, error_msg, updated_at
 - Índice compuesto (evaluation_id, created_at) en chat_messages
-- GRANT SELECT/INSERT/UPDATE/DELETE sobre chat_messages a capi_app
+- GRANT SELECT/INSERT/UPDATE/DELETE sobre chat_messages a kisabella_app
 - Nueva tabla chat_attachments con RLS completo
 """
 from typing import Sequence, Union
@@ -45,11 +45,11 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------ #
-    # 3. GRANT on chat_messages to capi_app (non-owner role, ADR-008)
+    # 3. GRANT on chat_messages to kisabella_app (non-owner role, ADR-008)
     #    RLS ENABLE + FORCE were already applied in migration 001.
     #    Policy chat_rls was also created in 001 — no duplicate needed.
     # ------------------------------------------------------------------ #
-    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON chat_messages TO capi_app")
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON chat_messages TO kisabella_app")
 
     # ------------------------------------------------------------------ #
     # 4. Create table chat_attachments
@@ -117,18 +117,18 @@ def upgrade() -> None:
             )
         )
     """)
-    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON chat_attachments TO capi_app")
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON chat_attachments TO kisabella_app")
 
 
 def downgrade() -> None:
     # Drop chat_attachments entirely
-    op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON chat_attachments FROM capi_app")
+    op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON chat_attachments FROM kisabella_app")
     op.execute("DROP POLICY IF EXISTS chat_attachments_owner ON chat_attachments")
     op.drop_index("idx_chat_attachments_message", table_name="chat_attachments")
     op.drop_table("chat_attachments")
 
     # Revert chat_messages additions
-    op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON chat_messages FROM capi_app")
+    op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON chat_messages FROM kisabella_app")
     op.drop_index("idx_chat_messages_eval_created", table_name="chat_messages")
     op.execute("ALTER TABLE chat_messages DROP COLUMN IF EXISTS updated_at")
     op.execute("ALTER TABLE chat_messages DROP COLUMN IF EXISTS error_msg")
