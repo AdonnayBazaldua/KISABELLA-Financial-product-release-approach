@@ -72,15 +72,15 @@ Requisitos: [Docker](https://docs.docker.com/get-docker/) con Compose v2 y **tu 
 ```bash
 git clone <url-de-este-repo> && cd <carpeta-del-repo>
 cp .env.example .env
-# edita .env → define ANTHROPIC_API_KEY, DB_PASSWORD y SECRET_KEY (≥ 32 caracteres)
+# edita .env → define ANTHROPIC_API_KEY y DB_PASSWORD
 docker compose up --build
 ```
 
 Abre <http://localhost:3000>. La documentación de la API está en <http://localhost:8000/docs>.
 
-> ⚠️ **Costo:** cada evaluación hace ~5 llamadas al LLM que se cobran a *tu* cuenta de Anthropic (tope duro de 6 llamadas / 20 k tokens de entrada por evaluación). Cada mensaje de chat es una llamada más.
+> ⚠️ **Costo:** cada evaluación hace ~5 llamadas al LLM que se cobran a *tu* cuenta de Anthropic (tope de 6 llamadas / ~20 k tokens de entrada estimados por evaluación; cada llamada se reintenta hasta 3 veces ante errores transitorios de la API). Cada mensaje de chat es una llamada más.
 >
-> 🔒 **Sin autenticación:** la app no tiene login y escucha solo en `127.0.0.1` a propósito. No la expongas a internet tal cual; si la despliegas, ponla detrás de un reverse proxy y define `ALLOWED_IPS`.
+> 🔒 **Sin autenticación:** la app no tiene login y escucha solo en `127.0.0.1` a propósito. No la expongas a internet tal cual; si la despliegas, ponla detrás de un reverse proxy con HTTPS y define `ALLOWED_IPS` (y `FORWARDED_ALLOW_IPS` con la dirección de tu proxy, para que el backend vea la IP real del cliente).
 
 Llaves opcionales en `.env`: `TAVILY_API_KEY` (búsqueda web del agente de Mercado) y `BANXICO_TOKEN` (tipo de cambio oficial). Sin ellas la app funciona igual (sin búsqueda web / TC manual).
 
@@ -93,7 +93,7 @@ Llaves opcionales en `.env`: `TAVILY_API_KEY` (búsqueda web del agente de Merca
 | IA | Claude (`claude-sonnet-4-6`) vía `langchain-anthropic`, orquestado con LangGraph; salida estructurada validada con Pydantic |
 | Datos | PostgreSQL 16 con Row-Level Security forzado (la app se conecta con un rol no-dueño) |
 | Integraciones | Banxico (USD/MXN), Tavily (búsqueda web), `markitdown` (archivo → texto) |
-| Infra | Docker Compose, config de Nginx para HTTPS + whitelist de IPs (opcional) |
+| Infra | Docker Compose (contenedores sin root), CI con GitHub Actions |
 
 ## Desarrollo
 

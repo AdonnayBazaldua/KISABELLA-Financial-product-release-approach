@@ -72,15 +72,15 @@ Requirements: [Docker](https://docs.docker.com/get-docker/) with Compose v2, and
 ```bash
 git clone <this-repo-url> && cd <repo-folder>
 cp .env.example .env
-# edit .env → set ANTHROPIC_API_KEY, DB_PASSWORD and SECRET_KEY (≥ 32 chars)
+# edit .env → set ANTHROPIC_API_KEY and DB_PASSWORD
 docker compose up --build
 ```
 
 Open <http://localhost:3000>. The API docs are at <http://localhost:8000/docs>.
 
-> ⚠️ **Cost:** every evaluation makes ~5 LLM calls billed to *your* Anthropic account (hard-capped at 6 calls / 20 k input tokens per evaluation). Each chat message is one more call.
+> ⚠️ **Cost:** every evaluation makes ~5 LLM calls billed to *your* Anthropic account (capped at 6 calls / ~20 k estimated input tokens per evaluation; a call is retried up to 3 times on transient API errors). Each chat message is one more call.
 >
-> 🔒 **No user auth:** the app has no login and is bound to `127.0.0.1` on purpose. Do not expose it to the internet as-is; if you deploy it, put it behind a reverse proxy and set `ALLOWED_IPS`.
+> 🔒 **No user auth:** the app has no login and is bound to `127.0.0.1` on purpose. Do not expose it to the internet as-is; if you deploy it, put it behind a reverse proxy with HTTPS and set `ALLOWED_IPS` (and `FORWARDED_ALLOW_IPS` to your proxy's address, so the backend sees the real client IP).
 
 Optional keys in `.env`: `TAVILY_API_KEY` (live web search for the Market agent) and `BANXICO_TOKEN` (official FX rate). Without them the app still works (no web search / manual FX).
 
@@ -93,7 +93,7 @@ Optional keys in `.env`: `TAVILY_API_KEY` (live web search for the Market agent)
 | AI | Claude (`claude-sonnet-4-6`) via `langchain-anthropic`, orchestrated with LangGraph; Pydantic-validated structured output |
 | Data | PostgreSQL 16 with enforced Row-Level Security (the app connects as a non-owner role) |
 | Integrations | Banxico (USD/MXN), Tavily (web search), `markitdown` (file → text) |
-| Infra | Docker Compose, Nginx config for optional HTTPS + IP whitelist |
+| Infra | Docker Compose (non-root containers), GitHub Actions CI |
 
 ## Development
 
