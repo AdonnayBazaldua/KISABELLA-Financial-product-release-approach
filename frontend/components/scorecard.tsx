@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   TrendingUp,
 } from "lucide-react";
+import { warnFlagLabel } from "@/lib/verdicts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type {
@@ -121,7 +122,7 @@ function WarnBanner({
           <div className="flex flex-wrap gap-1.5 mt-1">
             {flags.map((flag) => (
               <Badge key={flag} variant="warning">
-                {flag}
+                {warnFlagLabel(flag)}
               </Badge>
             ))}
           </div>

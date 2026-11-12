@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "vitest run",
     "gen:types": "../scripts/gen-types.sh",
     "check:types": "../scripts/gen-types.sh --check && tsc --noEmit"
   },

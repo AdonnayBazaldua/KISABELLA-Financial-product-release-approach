@@ -40,3 +40,11 @@ export const AGENT_LABELS: Record<string, string> = {
   riesgo: "Riesgo",
   estrategia: "Estrategia",
 };
+
+/** Flags de alerta que emite el backend (FinalVerdict.warn_flags). */
+const WARN_FLAG_LABELS: Record<string, string> = {
+  warn_fx: "TC distinto al de Banxico",
+  warn_no_web: "Sin búsqueda web",
+};
+
+export const warnFlagLabel = (flag: string) => WARN_FLAG_LABELS[flag] ?? flag;
