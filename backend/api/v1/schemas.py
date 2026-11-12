@@ -52,7 +52,7 @@ class CreateEvaluationRequest(BaseModel):
     target_price: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     estimated_units_month: int = Field(gt=0)
 
-    # TC: payload provee (Sprint 6 lo override con Banxico)
+    # TC: lo envía el usuario (prellenado desde Banxico); el backend etiqueta su procedencia (ADR-0005)
     exchange_rate_used: Decimal = Field(gt=0, max_digits=8, decimal_places=4)
 
 

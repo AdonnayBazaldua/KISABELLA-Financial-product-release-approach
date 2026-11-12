@@ -1,7 +1,7 @@
 /**
  * Cliente HTTP del backend FastAPI.
  *
- * URL split (audit P0-7):
+ * URL split:
  * - Server Components corren en el contenedor → usan API_URL_INTERNAL
  *   (red Docker interna: http://backend:8000).
  * - Browser/Client Components → usan NEXT_PUBLIC_API_URL (dominio público).

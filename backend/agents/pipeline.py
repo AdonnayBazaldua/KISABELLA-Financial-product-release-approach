@@ -4,9 +4,9 @@ ADR-001/002: state.agent_results es dict[name, AgentResult|AgentError].
 Cada agente corre en su nodo. Si falla, se captura en AgentError — el pipeline
 NO se aborta (graceful degradation).
 
-Timeouts (ADR del workflow tree):
+Timeouts:
 - Por agente: 90s vía asyncio.wait_for.
-- Global del pipeline: orquestado por el llamador (BackgroundTask con timeout).
+- Evaluaciones que queden colgadas en "running": las marca el watchdog (main.py) a los 5 min.
 """
 
 from __future__ import annotations

@@ -10,7 +10,6 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // TODO Sprint 6: enviar a Sentry / observabilidad
     console.error(error);
   }, [error]);
 

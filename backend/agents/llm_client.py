@@ -11,8 +11,6 @@ Tipos:
 
 Retries: tenacity 3x exponencial en RateLimitError/APITimeoutError/APIConnectionError.
 NO retry en ValidationError (output malformado != problema transitorio).
-
-Prompt caching: TODO Sprint 6 (cache_control en system block).
 """
 
 from __future__ import annotations
@@ -239,8 +237,9 @@ class BudgetedLLMClient:
     """Wrapper that enforces per-evaluation hard caps on LLM usage.
 
     Caps:
-    - max_calls: 6 (4 agents + margin for retries)
-    - max_input_tokens: 20,000
+    - max_calls: 6 logical calls (4 agents + orchestrator + 1 spare). Transient-error
+      retries (up to 3 per call, see AnthropicLLMClient) happen below this counter.
+    - max_input_tokens: 20,000, estimated as chars / 4 before sending.
     """
 
     def __init__(
