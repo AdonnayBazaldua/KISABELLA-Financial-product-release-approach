@@ -6,6 +6,7 @@
 
 [![Leer en Español](https://img.shields.io/badge/Leer_en-Español-c60b1e?style=for-the-badge)](README.es.md)
 
+[![CI](https://github.com/AdonnayBazaldua/KISABELLA-Financial-product-release-approach/actions/workflows/ci.yml/badge.svg)](https://github.com/AdonnayBazaldua/KISABELLA-Financial-product-release-approach/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -100,17 +101,18 @@ Optional keys in `.env`: `TAVILY_API_KEY` (live web search for the Market agent)
 # backend
 cd backend && python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
-pytest -q                      # ~280 tests, no network, LLM is faked
+pytest -q                      # ~295 tests, no network, LLM is faked
 
 # frontend
 cd frontend && npm ci && npm run build
+npm test && npm run check:types   # unit tests + API types in sync with the backend
 
 # real-Postgres RLS test and full-stack smoke test (need Docker)
 scripts/test-rls.sh
 scripts/smoke.sh
 ```
 
-Agents are plain async functions assembled by `build_agent()` (`backend/agents/`); prompts are Markdown files in `backend/agents/prompts/` that you can edit without touching Python. Design decisions: [`docs/adr/`](docs/adr/).
+Agents are plain async functions assembled by `build_agent()` (`backend/agents/`); prompts are Markdown files in `backend/agents/prompts/` that you can edit without touching Python. Design decisions: [`docs/adr/`](docs/adr/). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) · Security: [SECURITY.md](SECURITY.md).
 
 ## Known limitations
 
