@@ -312,6 +312,13 @@ export function Scorecard({ evaluation }: { evaluation: EvaluationDetail }) {
           </CardContent>
         </Card>
       )}
+
+      {evaluation.tokens_input != null && (
+        <p className="text-xs text-slate-400 mt-4 text-right">
+          Consumo del modelo: {evaluation.tokens_input.toLocaleString("es-MX")} tokens de entrada ·{" "}
+          {(evaluation.tokens_output ?? 0).toLocaleString("es-MX")} de salida
+        </p>
+      )}
     </div>
   );
 }

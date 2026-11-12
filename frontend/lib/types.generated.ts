@@ -365,6 +365,10 @@ export interface components {
             warn_flags: string[];
             /** Requires Human Review */
             requires_human_review: boolean;
+            /** Tokens Input */
+            tokens_input?: number | null;
+            /** Tokens Output */
+            tokens_output?: number | null;
             /** Progress */
             progress: {
                 [key: string]: "pending" | "running" | "ok" | "failed" | "degraded";

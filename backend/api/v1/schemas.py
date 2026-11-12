@@ -97,6 +97,8 @@ class EvaluationDetail(BaseModel):
     error_message: str | None
     warn_flags: list[str]
     requires_human_review: bool
+    tokens_input: int | None = None
+    tokens_output: int | None = None
     progress: dict[str, AgentStatus]
     agent_results: list[AgentResultDTO]
     created_at: datetime

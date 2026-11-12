@@ -65,6 +65,7 @@ def _make_complete_evaluation(eval_id: UUID | None = None) -> EvaluationModel:
             analisis_extenso="a" * 400,
             hallazgos_clave=["h1"],
             recomendaciones=["r1"],
+            error_message=None,
         )
         for name in ("financiero", "mercado", "riesgo", "estrategia")
     ]

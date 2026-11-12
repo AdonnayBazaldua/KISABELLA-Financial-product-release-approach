@@ -30,7 +30,7 @@ async def _run(monkeypatch, banxico, payload_rate):
     monkeypatch.setattr(svc, "get_usd_mxn", fake_get_usd_mxn, raising=False)
     captured = {}
 
-    async def spy_persist(self, session, eval_id, final_state):
+    async def spy_persist(self, session, eval_id, final_state, usage=None):
         captured["state"] = final_state
 
     monkeypatch.setattr(svc.EvaluationService, "_persist_results", spy_persist)

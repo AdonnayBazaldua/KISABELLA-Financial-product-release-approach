@@ -50,6 +50,7 @@ def build_system_blocks(evaluation: Any) -> list[SystemMessage]:
     agent_sections = "".join(
         f"\n## {ar.agent_name.capitalize()}\n{ar.analisis_extenso or ''}\n"
         for ar in (getattr(evaluation, "agent_results", None) or [])
+        if ar.analisis_extenso  # los agentes fallidos no aportan análisis
     )
     context_text = (
         f"# Evaluación: {inp.product_name if inp else evaluation.name}\n"

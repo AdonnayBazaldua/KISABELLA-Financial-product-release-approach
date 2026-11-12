@@ -21,7 +21,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from langchain_core.callbacks import get_usage_metadata_callback
+
 from agents.contracts import (
+    AgentError,
     TCSource,
     AgentResult,
     EvaluationInputs,
@@ -185,16 +188,24 @@ class EvaluationService:
             async with self._session_factory() as session:
                 await self._mark_status(session, eval_id, "running")
 
-            final_state = await run_evaluation(
-                inputs, tc_meta, self._llm, eval_id=eval_id, user_id=self._user_id,
-                warn_flags=warn_flags,
-            )
+            # Consumo real reportado por la API (no la estimacion del presupuesto).
+            with get_usage_metadata_callback() as usage_cb:
+                final_state = await run_evaluation(
+                    inputs, tc_meta, self._llm, eval_id=eval_id, user_id=self._user_id,
+                    warn_flags=warn_flags,
+                )
+            per_model = usage_cb.usage_metadata.values()
+            usage = {
+                "tokens_input": sum(u["input_tokens"] for u in per_model),
+                "tokens_output": sum(u["output_tokens"] for u in per_model),
+            }
 
             async with self._session_factory() as session:
-                await self._persist_results(session, eval_id, final_state)
+                await self._persist_results(session, eval_id, final_state, usage)
             log.info(
                 "pipeline_complete",
                 evaluation_id=str(eval_id),
+                **usage,
                 duration_ms=int((time.monotonic() - t0) * 1000),
             )
         except Exception as exc:  # noqa: BLE001
@@ -230,7 +241,8 @@ class EvaluationService:
             await session.commit()
 
     async def _persist_results(
-        self, session: AsyncSession, eval_id: UUID, final_state: dict
+        self, session: AsyncSession, eval_id: UUID, final_state: dict,
+        usage: dict | None = None,
     ) -> None:
         result = await session.execute(
             select(Evaluation).where(Evaluation.id == eval_id)
@@ -256,8 +268,17 @@ class EvaluationService:
                         recomendaciones=list(item.recomendaciones),
                     )
                 )
+            elif isinstance(item, AgentError):
+                session.add(
+                    AgentResultRow(
+                        evaluation_id=eval_id, agent_name=name, error_message=item.error_message
+                    )
+                )
 
         ev.status = "complete"
+        if usage:
+            ev.tokens_input = usage["tokens_input"] or None
+            ev.tokens_output = usage["tokens_output"] or None
         if verdict is not None:
             ev.final_verdict = verdict.veredicto
             ev.final_score = verdict.score_final
@@ -288,7 +309,7 @@ class EvaluationService:
         dtos: list[AgentResultDTO] = []
         for name in AGENTS.keys():
             ar = agents_by_name.get(name)
-            if ar is None:
+            if ar is None or ar.error_message:
                 progress[name] = "pending" if ev.status != "complete" else "failed"
                 dtos.append(
                     AgentResultDTO(
@@ -299,6 +320,7 @@ class EvaluationService:
                         analisis_extenso=None,
                         hallazgos_clave=[],
                         recomendaciones=[],
+                        error_message=ar.error_message if ar else None,
                     )
                 )
             else:
@@ -328,6 +350,8 @@ class EvaluationService:
             error_message=ev.error_message,
             warn_flags=ev.warn_flags or [],
             requires_human_review=ev.requires_human_review or False,
+            tokens_input=ev.tokens_input,
+            tokens_output=ev.tokens_output,
             progress=progress,
             agent_results=dtos,
             created_at=ev.created_at,
