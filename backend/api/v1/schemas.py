@@ -67,6 +67,8 @@ class EvaluationCreated(BaseModel):
 
 
 AgentStatus = Literal["pending", "running", "ok", "failed", "degraded"]
+EvaluationStatus = Literal["pending", "queued", "running", "complete", "error"]
+Verdict = Literal["viable", "viable_con_ajustes", "no_viable"]
 
 
 class AgentResultDTO(BaseModel):
@@ -88,8 +90,8 @@ class EvaluationDetail(BaseModel):
     id: UUID
     name: str
     product_name: str
-    status: Literal["pending", "queued", "running", "complete", "error"]
-    final_verdict: Literal["viable", "viable_con_ajustes", "no_viable"] | None
+    status: EvaluationStatus
+    final_verdict: Verdict | None
     final_score: int | None
     final_summary: str | None
     error_message: str | None
@@ -107,7 +109,7 @@ class EvaluationSummary(BaseModel):
     id: UUID
     name: str
     product_name: str
-    status: str
-    final_verdict: str | None
+    status: EvaluationStatus
+    final_verdict: Verdict | None
     final_score: int | None
     created_at: datetime
