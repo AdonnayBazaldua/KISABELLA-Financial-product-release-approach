@@ -7,7 +7,6 @@ Convenciones:
 - Secrets se modelan como SecretStr para evitar logging accidental.
 - DATABASE_URL solo acepta schemes postgresql.
 - LOG_LEVEL es un Literal cerrado (Python logging levels estándar).
-- SECRET_KEY debe tener al menos 32 caracteres.
 
 Uso desde FastAPI:
     from core.config import get_settings
@@ -47,41 +46,23 @@ class Settings(BaseSettings):
     migration_database_url: str | None = None
 
     # --- Seguridad ---
-    secret_key: SecretStr
     allowed_ips: str = "127.0.0.1"
 
     # --- Contexto RLS (ADR-008) ---
     app_user_id: str = "00000000-0000-0000-0000-000000000001"
 
-    # --- Frontend / red interna Docker ---
-    api_url_internal: str = "http://backend:8000"
-    next_public_api_url: str = "http://localhost:8000"
     # Origen del navegador permitido por CORS (el frontend, no la API).
     frontend_origin: str = "http://localhost:3000"
 
     # --- Observabilidad ---
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
-    # --- Chat + uploads (Sprint 5) ---
+    # --- Chat + uploads ---
     upload_root: str = "/data/uploads"
     max_file_size_bytes: int = 5 * 1024 * 1024
     max_files_per_message: int = 3
     max_messages_per_conversation: int = 60
-    chat_max_input_tokens: int = 60_000
-    chat_max_output_tokens: int = 2_000
-    chat_temperature: float = 0.4
-    chat_history_soft_warn_at: int = 24
     markitdown_timeout_s: int = 20
-
-    @field_validator("secret_key")
-    @classmethod
-    def _secret_key_min_length(cls, v: SecretStr) -> SecretStr:
-        if len(v.get_secret_value()) < 32:
-            raise ValueError(
-                "SECRET_KEY debe tener al menos 32 caracteres "
-                "(generar con: python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-            )
-        return v
 
     @field_validator("database_url")
     @classmethod

@@ -5,7 +5,7 @@ Thanks for your interest! Issues and pull requests are welcome. The UI, prompts 
 ## Setup
 
 ```bash
-cp .env.example .env            # set ANTHROPIC_API_KEY, DB_PASSWORD, SECRET_KEY (≥ 32 chars)
+cp .env.example .env            # set ANTHROPIC_API_KEY and DB_PASSWORD
 docker compose up --build       # full stack on http://localhost:3000
 
 # backend

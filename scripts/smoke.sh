@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")/.."
 export ENV_FILE="$(mktemp)" COMPOSE_PROJECT_NAME=kisabella-smoke
 trap 'docker compose --env-file "$ENV_FILE" down -v >/dev/null 2>&1; rm -f "$ENV_FILE"' EXIT
-printf 'ANTHROPIC_API_KEY=sk-ant-smoke\nDB_PASSWORD=smoke\nSECRET_KEY=%s\n' "$(printf 'x%.0s' $(seq 32))" > "$ENV_FILE"
+printf 'ANTHROPIC_API_KEY=sk-ant-smoke\nDB_PASSWORD=smoke\n' > "$ENV_FILE"
 C="docker compose --env-file $ENV_FILE"
 $C config -q
 $C up -d --build --wait --wait-timeout 300

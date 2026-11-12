@@ -10,7 +10,6 @@ def _valid_kwargs(**overrides):
     base = dict(
         anthropic_api_key="sk-ant-test-key",
         database_url="postgresql+psycopg://kisabella_app:pw@db:5432/kisabella_test",
-        secret_key="x" * 32,
     )
     base.update(overrides)
     return base
@@ -20,7 +19,6 @@ class TestSettingsValid:
     def test_loads_with_valid_inputs(self):
         s = Settings(_env_file=None, **_valid_kwargs())
         assert s.anthropic_api_key.get_secret_value() == "sk-ant-test-key"
-        assert s.secret_key.get_secret_value() == "x" * 32
 
     def test_defaults_applied_for_optional_fields(self):
         s = Settings(_env_file=None, **_valid_kwargs())
@@ -50,23 +48,8 @@ class TestSettingsRequiredFields:
             Settings(_env_file=None, **kwargs)
         assert "database_url" in str(exc.value)
 
-    def test_missing_secret_key_fails(self):
-        kwargs = _valid_kwargs()
-        del kwargs["secret_key"]
-        with pytest.raises(ValidationError) as exc:
-            Settings(_env_file=None, **kwargs)
-        assert "secret_key" in str(exc.value)
-
 
 class TestSettingsValidators:
-    def test_secret_key_too_short_fails(self):
-        with pytest.raises(ValidationError, match="32"):
-            Settings(_env_file=None, **_valid_kwargs(secret_key="too_short"))
-
-    def test_secret_key_exactly_32_chars_ok(self):
-        s = Settings(_env_file=None, **_valid_kwargs(secret_key="a" * 32))
-        assert s.secret_key.get_secret_value() == "a" * 32
-
     def test_database_url_wrong_scheme_fails(self):
         with pytest.raises(ValidationError, match="postgresql"):
             Settings(
@@ -101,12 +84,6 @@ class TestSettingsValidators:
 
 
 class TestSettingsSecretLeakage:
-    def test_secret_key_not_in_repr(self):
-        """SecretStr no debe filtrar el valor en logs/repr."""
-        s = Settings(_env_file=None, **_valid_kwargs())
-        assert "x" * 32 not in repr(s)
-        assert "x" * 32 not in str(s)
-
     def test_anthropic_key_not_in_repr(self):
         s = Settings(_env_file=None, **_valid_kwargs())
         assert "sk-ant-test-key" not in repr(s)

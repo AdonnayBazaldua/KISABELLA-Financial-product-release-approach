@@ -21,7 +21,6 @@ services:
     env_file: ${ENV_FILE:-.env}
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?Define ANTHROPIC_API_KEY en .env}
-      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY (>=32 chars) en .env}
       # Vacío = sin whitelist (en local el backend ve la IP del gateway Docker, no 127.0.0.1).
       ALLOWED_IPS: ${ALLOWED_IPS:-}
       # La app usa el rol NO-dueño (RLS efectivo); Alembic migra como dueño.
