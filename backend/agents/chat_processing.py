@@ -40,38 +40,34 @@ def cleanup_stream_queue(message_id: str) -> None:
 
 
 def build_system_blocks(evaluation: Any) -> list[SystemMessage]:
-    system_text = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
-    block1 = SystemMessage(
-        content=system_text,
-        additional_kwargs={"cache_control": {"type": "ephemeral"}},
-    )
+    """Prompt del sistema + contexto de la evaluación.
 
+    Ambos son idénticos en todos los turnos de una conversación, así que se marcan para
+    prompt caching. cache_control va en el bloque de contenido: en additional_kwargs
+    langchain-anthropic lo descarta. Un solo breakpoint al final cachea todo el prefijo.
+    """
     inp = getattr(evaluation, "inputs", None)
-    agent_sections = ""
-    for ar in (getattr(evaluation, "agent_results", None) or []):
-        agent_sections += (
-            f"\n## {ar.agent_name.capitalize()}\n"
-            f"{ar.analisis_extenso or ''}\n"
-        )
-
-    product_name = inp.product_name if inp else evaluation.name
-    target_price = inp.target_price if inp else "N/A"
-    units_month = inp.estimated_units_month if inp else "N/A"
-
+    agent_sections = "".join(
+        f"\n## {ar.agent_name.capitalize()}\n{ar.analisis_extenso or ''}\n"
+        for ar in (getattr(evaluation, "agent_results", None) or [])
+    )
     context_text = (
-        f"# Evaluación: {product_name}\n"
+        f"# Evaluación: {inp.product_name if inp else evaluation.name}\n"
         f"Veredicto: {evaluation.final_verdict} (score: {evaluation.final_score}/100)\n\n"
         f"## Resumen\n{evaluation.final_summary or ''}\n"
         f"{agent_sections}"
         f"\n## Datos originales\n"
-        f"Precio objetivo: ${target_price} MXN\n"
-        f"Unidades/mes estimadas: {units_month}\n"
+        f"Precio objetivo: ${inp.target_price if inp else 'N/A'} MXN\n"
+        f"Unidades/mes estimadas: {inp.estimated_units_month if inp else 'N/A'}\n"
     )
-    block2 = SystemMessage(
-        content=context_text,
-        additional_kwargs={"cache_control": {"type": "ephemeral"}},
-    )
-    return [block1, block2]
+    return [
+        SystemMessage(content=_SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")),
+        SystemMessage(
+            content=[
+                {"type": "text", "text": context_text, "cache_control": {"type": "ephemeral"}}
+            ]
+        ),
+    ]
 
 
 def build_history_messages(messages: list[Any]) -> list[Any]:
@@ -92,10 +88,8 @@ async def extract_markdown(path: str, mime_type: str, timeout_s: int = 20) -> st
     if _markitdown is None:
         return None
     try:
-        loop = asyncio.get_event_loop()
         result = await asyncio.wait_for(
-            loop.run_in_executor(None, _markitdown.convert, path),
-            timeout=float(timeout_s),
+            asyncio.to_thread(_markitdown.convert, path), timeout=float(timeout_s)
         )
         return result.text_content or None
     except Exception:
