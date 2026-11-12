@@ -15,7 +15,7 @@ from db.models import Evaluation, AppUser
 
 
 async def _run_watchdog_sql(session) -> int:
-    """Ejecuta el mismo SQL que _eval_orphan_watchdog en main.py."""
+    """Ejecuta el mismo SQL que _ORPHAN_SWEEPS['evaluations'] en main.py."""
     result = await session.execute(
         sql_text("""
             UPDATE evaluations
