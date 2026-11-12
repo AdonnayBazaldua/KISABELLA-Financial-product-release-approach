@@ -61,6 +61,14 @@ def load_prompt(name: str) -> PromptTemplates:
     )
 
 
+def untrusted(tag: str, text: str) -> str:
+    """Delimita contenido de terceros (web, adjuntos) para que el modelo lo trate como datos.
+
+    Se quita el nombre de la etiqueta del contenido: así el texto no puede cerrarla antes de tiempo.
+    """
+    return f"<{tag}>\n{text.replace(tag, '')}\n</{tag}>"
+
+
 def _render_user(template: str, inputs: EvaluationInputs, calc: Any, tool_result: str = "") -> str:
     """Rinde user_template con valores de inputs (+ calc + tool_result si existen)."""
     ctx: dict[str, Any] = inputs.model_dump(mode="json")
@@ -69,7 +77,9 @@ def _render_user(template: str, inputs: EvaluationInputs, calc: Any, tool_result
 
     safe_ctx = {k: ("N/D" if v is None else v) for k, v in ctx.items()}
     safe_ctx["web_search_results"] = (
-        tool_result if tool_result else "Sin resultados de búsqueda disponibles."
+        untrusted("resultados_web", tool_result)
+        if tool_result
+        else "Sin resultados de búsqueda disponibles."
     )
 
     return template.format(**safe_ctx)

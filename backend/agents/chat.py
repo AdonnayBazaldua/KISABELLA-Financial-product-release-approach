@@ -21,6 +21,7 @@ from agents.chat_processing import (
     cleanup_stream_queue,
     create_stream_queue,
 )
+from agents.base import untrusted
 from agents.llm_client import LLMClient
 from db.models import ChatAttachment, ChatMessage, Evaluation
 
@@ -105,7 +106,8 @@ async def _process_chat_turn(
             if att.markdown_extracted:
                 user_content.append({
                     "type": "text",
-                    "text": f"\n\n[Archivo: {att.original_name}]\n{att.markdown_extracted}",
+                    "text": f"\n\n[Archivo: {att.original_name}]\n"
+                    + untrusted("archivo_adjunto", att.markdown_extracted),
                 })
             elif att.mime_type.startswith("image/"):
                 import base64
