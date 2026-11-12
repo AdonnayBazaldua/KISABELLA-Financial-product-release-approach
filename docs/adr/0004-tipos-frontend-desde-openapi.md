@@ -15,7 +15,7 @@ Los tipos del frontend se generan con `openapi-typescript` desde `/openapi.json`
 
 - Positivo: drift backend/frontend imposible.
 - Positivo: un comando regenera todos los tipos.
-- Negativo: requiere backend corriendo para regenerar.
+- Negativo: requiere el entorno Python del backend para regenerar.
 - Negativo: tipos generados son verbosos — se usan type aliases para ergonomía.
 
 ## Alternativas consideradas
@@ -23,6 +23,6 @@ Los tipos del frontend se generan con `openapi-typescript` desde `/openapi.json`
 - Tipos manuales: descartado por drift comprobado en Sprint 1.
 - GraphQL codegen: over-engineering para una API REST sencilla.
 
-## Nota de implementación (2026-11-10)
+## Nota de implementación (2026-11-11)
 
-El script `npm run gen:types` y la dependencia `openapi-typescript` existen, pero el frontend aún consume `frontend/lib/types.ts`, escrito a mano como espejo de `api/v1/schemas.py`. Migrar a `types.generated.ts` está pendiente.
+Implementado. `scripts/gen-types.sh` vuelca el OpenAPI directamente desde la app (sin servidor ni red) y genera `frontend/lib/types.generated.ts`, que se versiona para que el frontend compile sin backend. `frontend/lib/types.ts` solo contiene alias sobre ese archivo. `npm run check:types` regenera en un temporal, falla si difiere del versionado y corre `tsc --noEmit`: esa es la guarda contra la deriva. Los enums de estado/veredicto son `Literal` en `api/v1/schemas.py` para que lleguen como uniones al frontend.
