@@ -4,7 +4,7 @@ import * as Progress from "@radix-ui/react-progress";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { EvaluationDetail, Verdict } from "@/lib/types";
-import { VERDICT_COLORS, VERDICT_LABELS } from "@/lib/verdicts";
+import { VERDICT_COLORS, VERDICT_LABELS, warnFlagLabel } from "@/lib/verdicts";
 
 const AGENT_LABELS: Record<string, string> = {
   financiero: "Financiero",
@@ -116,7 +116,7 @@ export function CompareTable({ evaluations }: { evaluations: EvaluationDetail[] 
                   {ev.warn_flags.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
                       {ev.warn_flags.map((f) => (
-                        <Badge key={f} variant="warning">{f}</Badge>
+                        <Badge key={f} variant="warning">{warnFlagLabel(f)}</Badge>
                       ))}
                     </div>
                   ) : (

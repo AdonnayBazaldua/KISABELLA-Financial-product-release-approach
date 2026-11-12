@@ -64,7 +64,7 @@ def _wrap_agent_node(
                 evaluation_id=eval_id,
                 duration_ms=int((time.monotonic() - t0) * 1000),
             )
-            return {"agent_results": {name: result}}
+            return {"agent_results": {name: result}, "warn_flags": result.warn_flags}
         except asyncio.TimeoutError:
             log.warning(
                 "agent_timeout",
@@ -125,6 +125,7 @@ async def run_evaluation(
     *,
     eval_id=None,
     user_id=None,
+    warn_flags: list[str] | None = None,
 ) -> PipelineState:
     """Helper: corre el pipeline completo y retorna el state final."""
     budgeted = BudgetedLLMClient(llm)
@@ -133,7 +134,7 @@ async def run_evaluation(
         "inputs": inputs,
         "tc_meta": tc_meta,
         "agent_results": {},
-        "warn_flags": [],
+        "warn_flags": list(warn_flags or []),
     }
     if eval_id is not None:
         initial["eval_id"] = eval_id

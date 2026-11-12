@@ -24,7 +24,7 @@ from core.config import get_settings
 # que `_resolve_*` reemplaza en la primera llamada real.
 # Los tests usan monkeypatch.setattr("services.upload_service.UPLOAD_ROOT", tmp_path)
 # y monkeypatch.setattr("services.upload_service.MAX_FILE_BYTES", N).
-UPLOAD_ROOT: Path = Path("/tmp/capi-uploads-default")
+UPLOAD_ROOT: Path = Path("/tmp/kisabella-uploads-default")
 MAX_FILE_BYTES: int = 5 * 1024 * 1024  # 5 MB fallback — sobrescrito al startup real
 
 

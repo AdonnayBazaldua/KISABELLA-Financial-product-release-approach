@@ -1,4 +1,4 @@
-"""FastAPI app entrypoint para CAPI-KISABELLA.
+"""FastAPI app entrypoint para Kisabella Financial Product Release.
 
 Lifespan:
 - Startup: valida settings, configura structlog, lanza watchdogs.
@@ -154,7 +154,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="CAPI-KISABELLA",
+        title="Kisabella Financial Product Release",
         description="Evaluador de viabilidad de productos físicos (multi-agente LLM)",
         version="0.1.0-rebuild",
         lifespan=lifespan,
@@ -167,7 +167,7 @@ def create_app() -> FastAPI:
     app.add_middleware(IPWhitelistMiddleware, allowed_ips=settings.allowed_ips)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.next_public_api_url],
+        allow_origins=[settings.frontend_origin],
         allow_credentials=False,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Request-Id"],

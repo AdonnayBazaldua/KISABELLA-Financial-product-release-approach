@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import pytest
@@ -9,6 +10,16 @@ import pytest
 from agents.chat import process_chat_turn
 from agents.chat_processing import get_stream_queue
 from db.models import ChatMessage, Evaluation, EvaluationInput
+
+
+def _factory(session):
+    """Factory estilo get_background_session_factory que reutiliza la sesión de test."""
+
+    @asynccontextmanager
+    async def _f():
+        yield session
+
+    return _f
 
 
 def _make_evaluation() -> tuple[Evaluation, EvaluationInput]:
@@ -85,7 +96,7 @@ async def test_process_chat_turn_completes_message(fake_session, fake_llm):
         evaluation_id=ev.id,
         user_msg_id=user_msg.id,
         assistant_msg_id=asst_msg.id,
-        session=fake_session,
+        session_factory=_factory(fake_session),
         llm=fake_llm,
     )
 
@@ -116,7 +127,7 @@ async def test_process_chat_turn_sets_error_on_llm_failure(fake_session, fake_ll
         evaluation_id=ev.id,
         user_msg_id=user_msg.id,
         assistant_msg_id=asst_msg.id,
-        session=fake_session,
+        session_factory=_factory(fake_session),
         llm=fake_llm,
     )
 

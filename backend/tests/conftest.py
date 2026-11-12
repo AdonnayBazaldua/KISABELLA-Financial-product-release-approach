@@ -58,6 +58,14 @@ def mock_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     # Also patch in banxico and tavily modules (they import get_settings locally)
     monkeypatch.setattr(banxico_mod, "get_settings", lambda: fake_settings)
     monkeypatch.setattr(tavily_mod, "get_settings", lambda: fake_settings)
+
+    # Cero red: run_pipeline consulta Banxico; por defecto simula "caído" (los tests de TC lo sobreescriben).
+    from services import evaluation_service as _svc
+
+    async def _no_banxico():
+        raise RuntimeError("banxico deshabilitado en tests")
+
+    monkeypatch.setattr(_svc, "get_usd_mxn", _no_banxico)
     yield
 
 

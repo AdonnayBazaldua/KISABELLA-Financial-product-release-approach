@@ -1,4 +1,4 @@
-"""Settings tipados de CAPI-KISABELLA.
+"""Settings tipados de Kisabella Financial Product Release.
 
 Validación estricta al startup: si falta una variable required o tiene
 formato inválido, el proceso falla rápido con ValidationError.
@@ -43,6 +43,8 @@ class Settings(BaseSettings):
 
     # --- Base de datos ---
     database_url: str
+    # Rol dueño (DDL) para Alembic. Si falta, se usa database_url.
+    migration_database_url: str | None = None
 
     # --- Seguridad ---
     secret_key: SecretStr
@@ -54,6 +56,8 @@ class Settings(BaseSettings):
     # --- Frontend / red interna Docker ---
     api_url_internal: str = "http://backend:8000"
     next_public_api_url: str = "http://localhost:8000"
+    # Origen del navegador permitido por CORS (el frontend, no la API).
+    frontend_origin: str = "http://localhost:3000"
 
     # --- Observabilidad ---
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
@@ -92,6 +96,11 @@ class Settings(BaseSettings):
                 f"DATABASE_URL debe usar uno de estos schemes: {', '.join(valid_schemes)}"
             )
         return v
+
+
+    @property
+    def migrations_url(self) -> str:
+        return self.migration_database_url or self.database_url
 
 
 @lru_cache(maxsize=1)

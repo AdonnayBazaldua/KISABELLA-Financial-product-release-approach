@@ -8,11 +8,11 @@
 -- ADR-008: RLS efectivo (no solo declarado).
 --
 -- Idempotente: usa DROP POLICY IF EXISTS + ALTER TABLE.
--- Nota sobre rol: el audit recomendó rol `capi_app` NO-owner como
+-- Nota sobre rol: el audit recomendó rol `kisabella_app` NO-owner como
 -- defensa-en-profundidad. Para 2-3 users internos con IP whitelist en
 -- Nginx, FORCE RLS + bindparams es suficiente sin la complejidad de
 -- two-role setup. Documentado en ADR-008. Si se suman users en Sprint
--- 7+, se introduce capi_app NO-owner.
+-- 7+, se introduce kisabella_app NO-owner.
 
 BEGIN;
 

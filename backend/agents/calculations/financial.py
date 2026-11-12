@@ -6,7 +6,7 @@ Diferencias respecto al original:
 - Recibe Pydantic EvaluationInputs, no TypedDict.
 - Retorna Pydantic FinancialCalcs frozen (no TypedDict).
 - Magic literals (99, 9999) reemplazados por None para casos no aplicables.
-- Sensibilidad TC ±10% agregada (estaba prometida en CONTEXT.md, faltaba en código).
+- Sensibilidad TC ±10% agregada (faltaba en el código).
 
 Score 0-100 derivado por reglas determinísticas — el LLM solo escribe
 el análisis textual, no decide el score. Esto da reproducibilidad.

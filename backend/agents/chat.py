@@ -25,7 +25,13 @@ from agents.llm_client import LLMClient
 from db.models import ChatAttachment, ChatMessage, Evaluation
 
 
-async def process_chat_turn(
+async def process_chat_turn(*, session_factory, **kwargs) -> None:
+    """Abre su PROPIA sesión (la del request ya está cerrada y sin contexto RLS)."""
+    async with session_factory() as session:
+        await _process_chat_turn(session=session, **kwargs)
+
+
+async def _process_chat_turn(
     *,
     evaluation_id: uuid.UUID,
     user_msg_id: uuid.UUID,
@@ -44,7 +50,7 @@ async def process_chat_turn(
         evaluation_id: UUID de la evaluación padre.
         user_msg_id: UUID del ChatMessage de rol 'user' ya persistido.
         assistant_msg_id: UUID del ChatMessage de rol 'assistant' (status='streaming').
-        session: AsyncSession abierta por el caller (BackgroundTask o test).
+        session: AsyncSession propia del turno (la abre process_chat_turn).
         llm: LLMClient — AnthropicLLMClient en prod, FakeLLMClient en tests.
         temperature: Temperatura para el modelo. Default 0.4 (ADR-007).
         max_tokens: Máximo de tokens de salida.

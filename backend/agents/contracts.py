@@ -1,4 +1,4 @@
-"""Contratos Pydantic del dominio CAPI-KISABELLA.
+"""Contratos Pydantic del dominio Kisabella Financial Product Release.
 
 Estos modelos son la fuente de verdad sobre las shapes que viajan por el pipeline.
 
@@ -74,7 +74,7 @@ class AgentResult(BaseModel):
     """Output estructurado de un agente especialista.
 
     Validado por ChatAnthropic.with_structured_output(AgentResult).
-    Constraints reflejan las convenciones de CLAUDE.md:
+    Constraints reflejan las convenciones del proyecto:
     - score entero 0-100
     - veredicto_corto: 1 línea descriptiva
     - analisis_extenso: ~300-500 palabras (chequeado por longitud de string)
@@ -92,6 +92,12 @@ class AgentResult(BaseModel):
     )
     hallazgos_clave: list[str] = Field(min_length=1, max_length=10)
     recomendaciones: list[str] = Field(min_length=1, max_length=10)
+
+    # Lo rellena el sistema (p. ej. warn_no_web), nunca el modelo.
+    warn_flags: list[str] = Field(
+        default_factory=list,
+        description="Uso interno del sistema. Déjalo siempre vacío.",
+    )
 
 
 class AgentError(BaseModel):

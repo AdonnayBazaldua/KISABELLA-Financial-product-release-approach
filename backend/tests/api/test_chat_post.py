@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from httpx import AsyncClient, ASGITransport
 
 from agents.llm_client import FakeLLMClient, get_llm_client
+from api.v1.evaluations import get_background_session_factory
 from api.v1.chat import router as chat_router, MAX_MESSAGES
 from db.models import ChatMessage, Evaluation, EvaluationInput
 from db.session import get_db
@@ -26,6 +27,7 @@ def _make_app(session):
         return FakeLLMClient()
 
     app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_background_session_factory] = lambda: (lambda: None)
     app.dependency_overrides[get_llm_client] = _override_llm
     return app
 
@@ -84,6 +86,26 @@ async def test_post_chat_message_returns_202(fake_session):
     body = resp.json()
     assert "message_id" in body
     assert body["status"] == "streaming"
+
+
+@pytest.mark.asyncio
+async def test_post_chat_background_task_gets_own_session_factory(fake_session):
+    """El task corre tras cerrar la sesión del request (sin RLS): debe recibir una factory."""
+    ev = _make_complete_eval()
+    fake_session.add(ev)
+    await fake_session.commit()
+
+    app = _make_app(fake_session)
+    with patch("api.v1.chat.process_chat_turn", new_callable=AsyncMock) as proc:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            await client.post(
+                f"/api/v1/evaluations/{ev.id}/chat/messages",
+                data={"content": "hola"},
+            )
+
+    kwargs = proc.call_args.kwargs
+    assert "session" not in kwargs
+    assert callable(kwargs["session_factory"])
 
 
 @pytest.mark.asyncio

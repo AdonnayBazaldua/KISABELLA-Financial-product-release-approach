@@ -81,12 +81,14 @@ def build_agent(
     calc_fn: CalcFn | None = None,
     score_fn: ScoreFn | None = None,
     tool_fn: ToolFn | None = None,
+    empty_tool_flag: str | None = None,
 ) -> AgentFn:
     """Construye un AgentFn componiendo prompt + calc + tool + score override.
 
     - calc_fn(inputs) → Pydantic model con pre-cálculos. Inyectado en user_template.
     - tool_fn(inputs) → str. Inyectado como {web_search_results} en user_template.
     - score_fn(raw_result, calc) → score 0-100. Reemplaza el score del LLM.
+    - empty_tool_flag: warn_flag que el agente añade a su resultado si tool_fn devuelve vacío.
     """
     prompts = load_prompt(prompt_name)
 
@@ -101,9 +103,13 @@ def build_agent(
             schema=AgentResult,
         )
 
+        # warn_flags siempre se sobreescribe: lo decide el sistema, no el LLM.
+        update: dict[str, Any] = {
+            "warn_flags": [empty_tool_flag] if empty_tool_flag and not tool_result else []
+        }
         if score_fn is not None:
-            return raw.model_copy(update={"score": score_fn(raw, calc)})
-        return raw
+            update["score"] = score_fn(raw, calc)
+        return raw.model_copy(update=update)
 
     _agent.__name__ = f"{name}_agent"
     _agent.__qualname__ = f"{name}_agent"

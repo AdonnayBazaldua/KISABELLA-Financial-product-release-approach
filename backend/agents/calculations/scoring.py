@@ -6,7 +6,7 @@ Pesos por agente (ADR-013):
 - Riesgo:     0.20
 - Estrategia: 0.20
 
-Degradación graceful (CLAUDE.md):
+Degradación graceful:
 - ≥3 agentes OK → veredicto normal del orquestador
 - 2 OK         → viable_con_ajustes + requires_human_review
 - ≤1 OK        → no_viable + "Datos insuficientes"
