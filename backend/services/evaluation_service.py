@@ -1,12 +1,8 @@
 """EvaluationService — orquesta DB + pipeline + serialización a DTOs.
 
 ADR-006: el endpoint POST devuelve 202 inmediato; el pipeline corre en
-BackgroundTask. El service expone create() (sync con DB) y run_pipeline()
-(async, llamado desde BackgroundTask con su propia session).
-
-Sprint 1 / Fase 0: el flujo es funcional pero algunos detalles son stub:
-- TC viene del payload (Banxico real en Sprint 6).
-- Watchdog de huérfanos: TODO (Sprint 6).
+BackgroundTask. El service expone create() (dentro del request) y run_pipeline()
+(llamado desde BackgroundTask con su propia sesión).
 """
 
 from __future__ import annotations
@@ -27,7 +23,6 @@ from sqlalchemy.orm import selectinload
 
 from agents.contracts import (
     TCSource,
-    AgentError,
     AgentResult,
     EvaluationInputs,
     TCMetadata,
@@ -68,30 +63,16 @@ def resolve_tc(
     return ("banxico", []) if kind == "banxico" else ("fallback_db", ["warn_fx"])
 
 
+# Campos de costos/ingresos/TC: idénticos en el request HTTP, el contrato interno y la tabla.
+_SHARED_FIELDS = set(EvaluationInputs.model_fields) - {"exchange_rate_at", "tc_source"}
+
+
 def _inputs_from_request(
     req: CreateEvaluationRequest, tc_source: TCSource = "user_provided"
 ) -> EvaluationInputs:
     """Mapea HTTP request → EvaluationInputs interno del pipeline."""
     return EvaluationInputs(
-        product_name=req.product_name,
-        description=req.description,
-        category=req.category,
-        sales_channel=req.sales_channel,
-        cost_purchase=req.cost_purchase,
-        cost_purchase_usd=req.cost_purchase_usd,
-        cost_freight=req.cost_freight,
-        cost_customs=req.cost_customs,
-        cost_storage=req.cost_storage,
-        cost_logistics_vehicle=req.cost_logistics_vehicle,
-        cost_logistics_viaticos=req.cost_logistics_viaticos,
-        cost_logistics_personnel=req.cost_logistics_personnel,
-        cost_shrinkage_pct=req.cost_shrinkage_pct,
-        cost_commission_pct=req.cost_commission_pct,
-        cost_marketing=req.cost_marketing,
-        cost_overhead=req.cost_overhead,
-        target_price=req.target_price,
-        estimated_units_month=req.estimated_units_month,
-        exchange_rate_used=req.exchange_rate_used,
+        **req.model_dump(include=_SHARED_FIELDS),
         exchange_rate_at=datetime.now(timezone.utc),
         tc_source=tc_source,
     )
@@ -101,71 +82,13 @@ def _eval_row_from_request(
     req: CreateEvaluationRequest, user_id: UUID, eval_id: UUID
 ) -> tuple[Evaluation, EvaluationInput]:
     """Construye las dos rows (Evaluation + EvaluationInput) desde el payload."""
-    eval_row = Evaluation(
-        id=eval_id,
-        created_by=user_id,
-        name=req.name,
-        status="pending",
-    )
+    eval_row = Evaluation(id=eval_id, created_by=user_id, name=req.name, status="pending")
     inputs_row = EvaluationInput(
         evaluation_id=eval_id,
-        product_name=req.product_name,
-        description=req.description,
-        category=req.category,
-        cost_purchase=req.cost_purchase,
-        cost_purchase_usd=req.cost_purchase_usd,
-        cost_freight=req.cost_freight,
-        cost_customs=req.cost_customs,
-        cost_storage=req.cost_storage,
-        cost_logistics_vehicle=req.cost_logistics_vehicle,
-        cost_logistics_viaticos=req.cost_logistics_viaticos,
-        cost_logistics_personnel=req.cost_logistics_personnel,
-        cost_shrinkage_pct=req.cost_shrinkage_pct,
-        cost_commission_pct=req.cost_commission_pct,
-        cost_marketing=req.cost_marketing,
-        cost_overhead=req.cost_overhead,
-        target_price=req.target_price,
-        estimated_units_month=req.estimated_units_month,
-        sales_channel=req.sales_channel,
-        exchange_rate_used=req.exchange_rate_used,
+        **req.model_dump(include=_SHARED_FIELDS),
         exchange_rate_at=datetime.now(timezone.utc),
     )
     return eval_row, inputs_row
-
-
-def _agent_result_to_dto(name: str, item: AgentResult | AgentError | None) -> AgentResultDTO:
-    """Serializa AgentResult/AgentError/None → DTO HTTP."""
-    if item is None:
-        return AgentResultDTO(
-            agent_name=name,
-            status="pending",
-            score=None,
-            veredicto_corto=None,
-            analisis_extenso=None,
-            hallazgos_clave=[],
-            recomendaciones=[],
-        )
-    if isinstance(item, AgentError):
-        return AgentResultDTO(
-            agent_name=name,
-            status="failed",
-            score=None,
-            veredicto_corto=None,
-            analisis_extenso=None,
-            hallazgos_clave=[],
-            recomendaciones=[],
-            error_message=item.error_message,
-        )
-    # AgentResult
-    return AgentResultDTO(
-        agent_name=name,
-        status="ok",
-        score=item.score,
-        veredicto_corto=item.veredicto_corto,
-        analisis_extenso=item.analisis_extenso,
-        hallazgos_clave=list(item.hallazgos_clave),
-        recomendaciones=list(item.recomendaciones),
-    )
 
 
 def compute_idempotency_hash(user_id: UUID, payload: dict) -> str:
