@@ -1,11 +1,11 @@
 # backend/services/upload_service.py
-"""Servicio de almacenamiento de archivos para el chat de seguimiento (Sprint 5).
+"""Servicio de almacenamiento de archivos para el chat de seguimiento.
 
 Responsabilidades:
-- Validar tamaño del archivo contra MAX_FILE_BYTES.
+- Validar tamaño del archivo contra max_bytes.
 - Detectar MIME real via magic bytes (filetype) — no confiar en el header declarado.
 - Aceptar solo tipos en ALLOWED_MIMES; rechazar cualquier otro con MimeNotAllowedError.
-- Escribir en UPLOAD_ROOT/<eval_id>/<message_id>/<sha256><ext> de forma idempotente.
+- Escribir en upload_root/<eval_id>/<message_id>/<sha256><ext> de forma idempotente.
 - Devolver UploadedFile con metadata completa para persistir en DB.
 """
 from __future__ import annotations
@@ -16,28 +16,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import filetype
-
-from core.config import get_settings
-
-# Módulo-level constants — inicializadas perezosamente para que los tests
-# puedan monkeypatch antes de que se lean.  Se definen con valores sentinela
-# que `_resolve_*` reemplaza en la primera llamada real.
-# Los tests usan monkeypatch.setattr("services.upload_service.UPLOAD_ROOT", tmp_path)
-# y monkeypatch.setattr("services.upload_service.MAX_FILE_BYTES", N).
-UPLOAD_ROOT: Path = Path("/tmp/kisabella-uploads-default")
-MAX_FILE_BYTES: int = 5 * 1024 * 1024  # 5 MB fallback — sobrescrito al startup real
-
-
-def _init_from_settings() -> None:
-    """Inicializa las constantes de módulo desde Settings al primer uso real.
-
-    Separado para que los tests puedan monkeypatch ANTES de que se invoque
-    save_upload, sin necesidad de un .env válido durante la colección.
-    """
-    global UPLOAD_ROOT, MAX_FILE_BYTES
-    s = get_settings()
-    UPLOAD_ROOT = Path(s.upload_root)
-    MAX_FILE_BYTES = s.max_file_size_bytes
 
 ALLOWED_MIMES: frozenset[str] = frozenset({
     "application/pdf",
@@ -71,7 +49,7 @@ class MimeNotAllowedError(ValueError):
 
 
 class FileTooLargeError(ValueError):
-    """Se lanza cuando el archivo supera MAX_FILE_BYTES."""
+    """Se lanza cuando el archivo supera max_bytes."""
 
 
 @dataclass
@@ -91,6 +69,8 @@ async def save_upload(
     declared_mime: str,
     eval_id: uuid.UUID,
     message_id: uuid.UUID,
+    upload_root: Path,
+    max_bytes: int,
 ) -> UploadedFile:
     """Valida y persiste un archivo subido por el usuario.
 
@@ -100,17 +80,19 @@ async def save_upload(
         declared_mime: Tipo MIME declarado en el Content-Type del request.
         eval_id: UUID de la evaluación asociada (para organizar el path).
         message_id: UUID del mensaje al que pertenece el archivo.
+        upload_root: Directorio raíz de almacenamiento (settings.upload_root).
+        max_bytes: Tamaño máximo por archivo (settings.max_file_size_bytes).
 
     Returns:
         UploadedFile con metadata completa para persistir en DB.
 
     Raises:
-        FileTooLargeError: Si len(data) > MAX_FILE_BYTES.
+        FileTooLargeError: Si len(data) > max_bytes.
         MimeNotAllowedError: Si el MIME detectado no está en ALLOWED_MIMES.
     """
-    if len(data) > MAX_FILE_BYTES:
+    if len(data) > max_bytes:
         raise FileTooLargeError(
-            f"Archivo excede {MAX_FILE_BYTES // 1024 // 1024}MB "
+            f"Archivo excede {max_bytes // 1024 // 1024}MB "
             f"(tamaño recibido: {len(data)} bytes)"
         )
 
@@ -137,7 +119,7 @@ async def save_upload(
     sha = hashlib.sha256(data).hexdigest()
     ext = _MIME_TO_EXT.get(mime, ".bin")
 
-    dest_dir = UPLOAD_ROOT / str(eval_id) / str(message_id)
+    dest_dir = upload_root / str(eval_id) / str(message_id)
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     dest = dest_dir / f"{sha}{ext}"

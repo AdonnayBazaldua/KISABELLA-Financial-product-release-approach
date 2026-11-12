@@ -11,12 +11,13 @@ from httpx import AsyncClient, ASGITransport
 
 from agents.llm_client import FakeLLMClient, get_llm_client
 from api.v1.evaluations import get_background_session_factory
-from api.v1.chat import router as chat_router, MAX_MESSAGES
+from api.v1.chat import get_settings, router as chat_router
+from core.config import Settings
 from db.models import ChatMessage, Evaluation, EvaluationInput
 from db.session import get_db
 
 
-def _make_app(session):
+def _make_app(session, **settings):
     app = FastAPI()
     app.include_router(chat_router)
 
@@ -29,6 +30,12 @@ def _make_app(session):
     app.dependency_overrides[get_db] = _override_db
     app.dependency_overrides[get_background_session_factory] = lambda: (lambda: None)
     app.dependency_overrides[get_llm_client] = _override_llm
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None,
+        anthropic_api_key="x",
+        database_url="postgresql+asyncpg://t:t@localhost/t",
+        **settings,
+    )
     return app
 
 
@@ -125,9 +132,7 @@ async def test_post_chat_returns_404_for_pending_eval(fake_session):
 
 
 @pytest.mark.asyncio
-async def test_post_chat_returns_429_at_message_limit(fake_session, monkeypatch):
-    import api.v1.chat as chat_mod
-    monkeypatch.setattr(chat_mod, "MAX_MESSAGES", 2)
+async def test_post_chat_returns_429_at_message_limit(fake_session):
 
     ev = _make_complete_eval()
     fake_session.add(ev)
@@ -145,7 +150,7 @@ async def test_post_chat_returns_429_at_message_limit(fake_session, monkeypatch)
         fake_session.add(m)
     await fake_session.commit()
 
-    app = _make_app(fake_session)
+    app = _make_app(fake_session, max_messages_per_conversation=2)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/evaluations/{ev.id}/chat/messages",
@@ -218,16 +223,14 @@ async def test_post_chat_returns_404_for_nonexistent_eval(fake_session):
 
 
 @pytest.mark.asyncio
-async def test_post_chat_returns_400_for_oversized_file(fake_session, monkeypatch):
-    import api.v1.chat as chat_mod
-    monkeypatch.setattr(chat_mod, "MAX_FILE_BYTES", 10)
+async def test_post_chat_returns_400_for_oversized_file(fake_session, tmp_path):
 
     ev = _make_complete_eval()
     fake_session.add(ev)
     await fake_session.commit()
 
     import io
-    app = _make_app(fake_session)
+    app = _make_app(fake_session, max_file_size_bytes=10, upload_root=str(tmp_path))
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/evaluations/{ev.id}/chat/messages",
@@ -235,3 +238,24 @@ async def test_post_chat_returns_400_for_oversized_file(fake_session, monkeypatc
             files={"files": ("test.txt", io.BytesIO(b"x" * 20), "text/plain")},
         )
     assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_attachment_is_stored_under_configured_upload_root(fake_session, tmp_path):
+    """Bug: los adjuntos caian en /tmp porque nadie leia UPLOAD_ROOT de settings."""
+    import io
+
+    ev = _make_complete_eval()
+    fake_session.add(ev)
+    await fake_session.commit()
+
+    app = _make_app(fake_session, upload_root=str(tmp_path))
+    with patch("api.v1.chat.process_chat_turn", new_callable=AsyncMock):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post(
+                f"/api/v1/evaluations/{ev.id}/chat/messages",
+                data={"content": "con archivo"},
+                files={"files": ("nota.txt", io.BytesIO(b"hola"), "text/plain")},
+            )
+    assert resp.status_code == 202
+    assert [p.name for p in tmp_path.rglob("*.txt")] != []

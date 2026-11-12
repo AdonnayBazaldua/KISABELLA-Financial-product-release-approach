@@ -17,8 +17,7 @@ from services.upload_service import (
 
 
 @pytest.mark.asyncio
-async def test_save_upload_pdf_creates_file(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.upload_service.UPLOAD_ROOT", tmp_path)
+async def test_save_upload_pdf_creates_file(tmp_path):
     content = b"%PDF-1.4 fake pdf content here"
     eval_id = uuid.uuid4()
     msg_id = uuid.uuid4()
@@ -29,6 +28,8 @@ async def test_save_upload_pdf_creates_file(tmp_path, monkeypatch):
         declared_mime="application/pdf",
         eval_id=eval_id,
         message_id=msg_id,
+        upload_root=tmp_path,
+        max_bytes=5 * 1024 * 1024,
     )
 
     assert result.mime_type == "application/pdf"
@@ -39,8 +40,7 @@ async def test_save_upload_pdf_creates_file(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_save_upload_image_detected_as_image(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.upload_service.UPLOAD_ROOT", tmp_path)
+async def test_save_upload_image_detected_as_image(tmp_path):
     # minimal JPEG magic bytes
     jpeg_header = bytes([0xFF, 0xD8, 0xFF, 0xE0]) + b"\x00" * 100
     result = await save_upload(
@@ -49,14 +49,15 @@ async def test_save_upload_image_detected_as_image(tmp_path, monkeypatch):
         declared_mime="image/jpeg",
         eval_id=uuid.uuid4(),
         message_id=uuid.uuid4(),
+        upload_root=tmp_path,
+        max_bytes=5 * 1024 * 1024,
     )
     assert result.is_image
     assert result.mime_type == "image/jpeg"
 
 
 @pytest.mark.asyncio
-async def test_save_upload_rejects_unknown_mime(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.upload_service.UPLOAD_ROOT", tmp_path)
+async def test_save_upload_rejects_unknown_mime(tmp_path):
     # zip magic bytes
     zip_content = b"PK\x03\x04" + b"\x00" * 50
     with pytest.raises(MimeNotAllowedError):
@@ -66,13 +67,13 @@ async def test_save_upload_rejects_unknown_mime(tmp_path, monkeypatch):
             declared_mime="application/zip",
             eval_id=uuid.uuid4(),
             message_id=uuid.uuid4(),
+            upload_root=tmp_path,
+            max_bytes=5 * 1024 * 1024,
         )
 
 
 @pytest.mark.asyncio
-async def test_save_upload_rejects_oversized(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.upload_service.UPLOAD_ROOT", tmp_path)
-    monkeypatch.setattr("services.upload_service.MAX_FILE_BYTES", 10)
+async def test_save_upload_rejects_oversized(tmp_path):
     with pytest.raises(FileTooLargeError):
         await save_upload(
             data=b"x" * 11,
@@ -80,12 +81,13 @@ async def test_save_upload_rejects_oversized(tmp_path, monkeypatch):
             declared_mime="text/plain",
             eval_id=uuid.uuid4(),
             message_id=uuid.uuid4(),
+            upload_root=tmp_path,
+            max_bytes=10,
         )
 
 
 @pytest.mark.asyncio
-async def test_save_upload_text_file(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.upload_service.UPLOAD_ROOT", tmp_path)
+async def test_save_upload_text_file(tmp_path):
     content = b"col1,col2\n1,2\n3,4"
     result = await save_upload(
         data=content,
@@ -93,14 +95,15 @@ async def test_save_upload_text_file(tmp_path, monkeypatch):
         declared_mime="text/csv",
         eval_id=uuid.uuid4(),
         message_id=uuid.uuid4(),
+        upload_root=tmp_path,
+        max_bytes=5 * 1024 * 1024,
     )
     assert "text/" in result.mime_type
     assert not result.is_image
 
 
 @pytest.mark.asyncio
-async def test_save_upload_undetectable_binary_with_text_mime(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.upload_service.UPLOAD_ROOT", tmp_path)
+async def test_save_upload_undetectable_binary_with_text_mime(tmp_path):
     # Binary with no recognizable magic bytes — filetype returns None
     data = b"\x00\x01\x02\x03" * 20
     result = await save_upload(
@@ -109,6 +112,8 @@ async def test_save_upload_undetectable_binary_with_text_mime(tmp_path, monkeypa
         declared_mime="text/plain",
         eval_id=uuid.uuid4(),
         message_id=uuid.uuid4(),
+        upload_root=tmp_path,
+        max_bytes=5 * 1024 * 1024,
     )
     assert result.mime_type == "text/plain"
     assert not result.is_image

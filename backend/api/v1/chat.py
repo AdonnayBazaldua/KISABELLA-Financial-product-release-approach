@@ -5,6 +5,7 @@ import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import (
     APIRouter,
@@ -22,10 +23,10 @@ from sqlalchemy.orm import selectinload
 from sse_starlette.sse import EventSourceResponse
 
 from agents.chat import process_chat_turn
-from agents.chat_processing import get_stream_queue
+from agents.chat_processing import extract_markdown, get_stream_queue
 from agents.llm_client import LLMClient, get_llm_client
 from api.v1.chat_schemas import AttachmentDTO, ChatMessageCreated, ChatMessageDTO
-from core.config import get_settings
+from core.config import Settings, get_settings
 from db.models import ChatAttachment, ChatMessage, Evaluation
 from api.v1.evaluations import get_background_session_factory
 from db.session import get_db
@@ -33,51 +34,16 @@ from services.upload_service import FileTooLargeError, MimeNotAllowedError, save
 
 router = APIRouter(prefix="/api/v1", tags=["chat"])
 
-# Sentinel defaults — no llaman a get_settings() en import time.
-# Tests pueden monkeypatch antes de la primera request.
-# Los valores reales se leen desde settings en la primera request via _resolve_limits().
-MAX_MESSAGES: int = 60
-MAX_FILES: int = 3
-MAX_FILE_BYTES: int = 5 * 1024 * 1024
-
-
-def _resolve_limits() -> None:
-    """Lee settings una vez y actualiza los módule-level limits.
-
-    Idempotente: si los valores ya fueron sobrescritos por monkeypatch en tests,
-    no los pisa (solo corre si MAX_MESSAGES sigue siendo el sentinel 60 Y
-    get_settings está disponible).
-    """
-    global MAX_MESSAGES, MAX_FILES, MAX_FILE_BYTES
-    try:
-        s = get_settings()
-        MAX_MESSAGES = s.max_messages_per_conversation
-        MAX_FILES = s.max_files_per_message
-        MAX_FILE_BYTES = s.max_file_size_bytes
-    except Exception:
-        pass  # En tests sin .env válido usamos los valores sentinel
-
-
-async def _check_streaming_turn(db: AsyncSession, eval_id: uuid.UUID) -> bool:
-    """Returns True if there is already an active streaming assistant message.
-
-    SQLite does not support WITH FOR UPDATE SKIP LOCKED; falls back to a
-    plain SELECT in that case (acceptable for a 2-3 user internal tool).
-    """
-    stmt = (
-        select(ChatMessage)
+async def _has_streaming_turn(db: AsyncSession, eval_id: uuid.UUID) -> bool:
+    """True si ya hay un mensaje del asistente en streaming para la evaluación."""
+    result = await db.execute(
+        select(ChatMessage.id)
         .where(ChatMessage.evaluation_id == eval_id)
         .where(ChatMessage.role == "assistant")
         .where(ChatMessage.status == "streaming")
+        .limit(1)
     )
-    try:
-        stmt_locked = stmt.with_for_update(skip_locked=True)
-        result = await db.execute(stmt_locked)
-    except Exception:
-        # SQLite or other backends that don't support SKIP LOCKED
-        result = await db.execute(stmt)
-
-    return result.scalar_one_or_none() is not None
+    return result.first() is not None
 
 
 @router.post(
@@ -93,13 +59,15 @@ async def post_chat_message(
     db: AsyncSession = Depends(get_db),
     llm: LLMClient = Depends(get_llm_client),
     session_factory=Depends(get_background_session_factory),
+    settings: Settings = Depends(get_settings),
 ) -> ChatMessageCreated:
     """Crea un turno de chat para una evaluación completada.
 
     Devuelve 202 inmediatamente. El procesamiento LLM corre en BackgroundTask.
     El frontend hace polling o se suscribe al SSE stream para obtener tokens.
     """
-    _resolve_limits()
+    max_files = settings.max_files_per_message
+    max_file_bytes = settings.max_file_size_bytes
 
     # --- Verificar que la evaluación existe y está completa ---
     # session.get() uses the identity map and avoids postgresql.UUID type
@@ -118,21 +86,21 @@ async def post_chat_message(
         .where(ChatMessage.evaluation_id == eval_id)
     )
     msg_count = count_result.scalar_one()
-    if msg_count >= MAX_MESSAGES:
+    if msg_count >= settings.max_messages_per_conversation:
         raise HTTPException(
             status_code=429,
             detail="Límite de mensajes alcanzado para esta evaluación",
         )
 
     # --- Verificar que no haya un turno activo en streaming ---
-    if await _check_streaming_turn(db, eval_id):
+    if await _has_streaming_turn(db, eval_id):
         raise HTTPException(status_code=409, detail="Ya hay un turno en proceso")
 
     # --- Validar cantidad de archivos ---
-    if len(files) > MAX_FILES:
+    if len(files) > max_files:
         raise HTTPException(
             status_code=400,
-            detail=f"Máximo {MAX_FILES} archivos por mensaje",
+            detail=f"Máximo {max_files} archivos por mensaje",
         )
 
     # --- Insertar mensaje del usuario ---
@@ -148,21 +116,9 @@ async def post_chat_message(
     await db.flush()
 
     # --- Procesar archivos adjuntos ---
-    total_bytes = 0
-    MAX_TOTAL_BYTES = MAX_FILES * MAX_FILE_BYTES  # 15MB total (3 × 5MB)
     for f in files:
+        # ponytail: lee el archivo completo y luego valida; tope real = client_max_body_size del proxy
         raw = await f.read()
-        if len(raw) > MAX_FILE_BYTES:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Archivo '{f.filename}' excede 5MB",
-            )
-        total_bytes += len(raw)
-        if total_bytes > MAX_TOTAL_BYTES:
-            raise HTTPException(
-                status_code=400,
-                detail="Tamaño total de archivos excede 15MB",
-            )
         try:
             uploaded = await save_upload(
                 data=raw,
@@ -170,23 +126,16 @@ async def post_chat_message(
                 declared_mime=f.content_type or "application/octet-stream",
                 eval_id=eval_id,
                 message_id=user_msg.id,
+                upload_root=Path(settings.upload_root),
+                max_bytes=max_file_bytes,
             )
-        except MimeNotAllowedError as e:
+        except (MimeNotAllowedError, FileTooLargeError) as e:
             raise HTTPException(status_code=400, detail=str(e))
-        except FileTooLargeError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
-        from agents.chat_processing import extract_markdown
-
-        try:
-            _markitdown_timeout = get_settings().markitdown_timeout_s
-        except Exception:
-            _markitdown_timeout = 20
 
         markdown = await extract_markdown(
             uploaded.storage_path,
             uploaded.mime_type,
-            timeout_s=_markitdown_timeout,
+            timeout_s=settings.markitdown_timeout_s,
         )
 
         att = ChatAttachment()
@@ -232,79 +181,63 @@ async def post_chat_message(
 async def stream_chat_message(
     eval_id: uuid.UUID,
     message_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    session_factory=Depends(get_background_session_factory),
 ):
-    """SSE stream de tokens para un mensaje de asistente en status=streaming."""
+    """SSE stream de tokens para un mensaje de asistente en status=streaming.
+
+    El generador corre cuando la sesión del request ya se cerró, así que abre
+    sesiones propias y cortas: no retiene una conexión del pool durante el stream.
+    """
+
+    async def _load() -> ChatMessage | None:
+        async with session_factory() as session:
+            result = await session.execute(
+                select(ChatMessage)
+                .where(ChatMessage.id == message_id)
+                .where(ChatMessage.evaluation_id == eval_id)
+            )
+            return result.scalar_one_or_none()
+
+    def _final_event(msg: ChatMessage | None) -> dict:
+        if msg is None:
+            return _event("error", error="Mensaje no encontrado", code="NOT_FOUND")
+        if msg.status == "error":
+            return _event("error", error=msg.error_msg or "Error desconocido", code="LLM_ERROR")
+        return _event("complete", message_id=str(message_id), content=msg.content)
 
     async def event_generator():
-        msg_result = await db.execute(
-            select(ChatMessage).where(ChatMessage.id == message_id)
-        )
-        msg = msg_result.scalar_one_or_none()
-        if msg is None:
-            yield {
-                "event": "error",
-                "data": json.dumps({"error": "Mensaje no encontrado", "code": "NOT_FOUND"}),
-            }
-            return
-
-        if msg.status == "complete":
-            yield {
-                "event": "complete",
-                "data": json.dumps({"message_id": str(message_id), "content": msg.content}),
-            }
-            return
-
-        if msg.status == "error":
-            yield {
-                "event": "error",
-                "data": json.dumps(
-                    {"error": msg.error_msg or "Error desconocido", "code": "LLM_ERROR"}
-                ),
-            }
+        msg = await _load()
+        if msg is None or msg.status != "streaming":
+            yield _final_event(msg)
             return
 
         q = get_stream_queue(str(message_id))
         if q is None:
-            yield {
-                "event": "error",
-                "data": json.dumps(
-                    {"error": "Stream no disponible", "code": "STREAM_UNAVAILABLE"}
-                ),
-            }
+            # El turno pudo terminar entre la lectura y aquí; si sigue "streaming", no hay cola (otro worker/reinicio).
+            msg = await _load()
+            if msg is not None and msg.status == "streaming":
+                yield _event("error", error="Stream no disponible", code="STREAM_UNAVAILABLE")
+            else:
+                yield _final_event(msg)
             return
 
-        yield {"event": "status", "data": json.dumps({"status": "streaming"})}
-
+        yield _event("status", status="streaming")
         while True:
             try:
                 token = await asyncio.wait_for(q.get(), timeout=15.0)
             except asyncio.TimeoutError:
                 yield {"event": "ping", "data": "keepalive"}
                 continue
-
-            if token is None:
-                # Señal de fin de stream — refrescar y emitir complete o error
-                await db.refresh(msg)
-                if msg.status == "error":
-                    yield {
-                        "event": "error",
-                        "data": json.dumps(
-                            {"error": msg.error_msg or "Error", "code": "LLM_ERROR"}
-                        ),
-                    }
-                else:
-                    yield {
-                        "event": "complete",
-                        "data": json.dumps(
-                            {"message_id": str(message_id), "content": msg.content}
-                        ),
-                    }
-                break
-
-            yield {"event": "token", "data": json.dumps({"token": token})}
+            if token is None:  # fin del stream: releer el estado final persistido
+                yield _final_event(await _load())
+                return
+            yield _event("token", token=token)
 
     return EventSourceResponse(event_generator())
+
+
+def _event(name: str, **data) -> dict:
+    return {"event": name, "data": json.dumps(data)}
 
 
 @router.get(
