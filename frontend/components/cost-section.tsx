@@ -33,19 +33,23 @@ interface FieldProps {
   type?: "number" | "text";
   suffix?: string;
   step?: string;
+  min?: number;
+  required?: boolean;
 }
 
-export function CostField({ label, name, value, onChange, type = "number", suffix, step = "0.01" }: FieldProps) {
+export function CostField({ label, name, value, onChange, type = "number", suffix, step = "0.01", min = 0, required }: FieldProps) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-slate-600">{label}</label>
+      <label htmlFor={name} className="text-sm font-medium text-slate-600">{label}</label>
       <div className="relative flex items-center">
         <input
+          id={name}
+          required={required}
           type={type}
           name={name}
           value={value}
           step={step}
-          min={0}
+          min={type === "number" ? min : undefined}
           onChange={(e) => onChange(name, type === "number" ? parseFloat(e.target.value) || 0 : e.target.value)}
           className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
         />

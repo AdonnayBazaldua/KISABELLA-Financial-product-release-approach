@@ -32,6 +32,19 @@ interface FetchOptions extends RequestInit {
   cache?: RequestCache;
 }
 
+/** Mensaje legible de un error del backend. Los 422 de FastAPI traen una lista por campo. */
+export function errorDetail(body: unknown, status: number): string {
+  const detail = (body as { detail?: unknown } | null)?.detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((e: { loc?: unknown[]; msg?: string }) => `${e.loc?.at(-1) ?? "campo"}: ${e.msg}`)
+      .join("; ");
+  }
+  if (typeof detail === "string") return detail;
+  const nested = (detail as { detail?: unknown } | undefined)?.detail;
+  return typeof nested === "string" ? nested : `HTTP ${status}`;
+}
+
 async function apiFetch<T>(
   path: string,
   options?: FetchOptions
@@ -49,8 +62,7 @@ async function apiFetch<T>(
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
     try {
-      const body = await res.json();
-      detail = body?.detail?.detail ?? body?.detail ?? JSON.stringify(body);
+      detail = errorDetail(await res.json(), res.status);
     } catch {
       detail = await res.text().catch(() => detail);
     }

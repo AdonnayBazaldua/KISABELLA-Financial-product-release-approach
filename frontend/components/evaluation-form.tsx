@@ -81,14 +81,15 @@ export function EvaluationForm() {
 
       <CostSection title="1. Producto" defaultOpen>
         <div className="col-span-2">
-          <CostField label="Nombre de la evaluación" name="name" value={form.name} onChange={handleChange} type="text" />
+          <CostField label="Nombre de la evaluación" name="name" value={form.name} onChange={handleChange} type="text" required />
         </div>
         <div className="col-span-2">
-          <CostField label="Nombre del producto" name="product_name" value={form.product_name} onChange={handleChange} type="text" />
+          <CostField label="Nombre del producto" name="product_name" value={form.product_name} onChange={handleChange} type="text" required />
         </div>
         <div className="col-span-2">
-          <label className="text-sm font-medium text-slate-600">Descripción</label>
+          <label htmlFor="description" className="text-sm font-medium text-slate-600">Descripción</label>
           <textarea
+            id="description"
             name="description"
             value={form.description ?? ""}
             onChange={(e) => handleChange("description", e.target.value)}
@@ -122,8 +123,8 @@ export function EvaluationForm() {
       </CostSection>
 
       <CostSection title="3. Precio y Volumen">
-        <CostField label="Precio objetivo de venta" name="target_price" value={form.target_price} onChange={handleChange} suffix="MXN" />
-        <CostField label="Unidades estimadas / mes" name="estimated_units_month" value={form.estimated_units_month} onChange={handleChange} step="1" />
+        <CostField label="Precio objetivo de venta" name="target_price" value={form.target_price} onChange={handleChange} suffix="MXN" min={0.01} required />
+        <CostField label="Unidades estimadas / mes" name="estimated_units_month" value={form.estimated_units_month} onChange={handleChange} step="1" min={1} required />
       </CostSection>
 
       {error && (
