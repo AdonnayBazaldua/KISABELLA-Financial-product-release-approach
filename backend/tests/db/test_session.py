@@ -33,7 +33,6 @@ def _patch_settings(monkeypatch):
         _env_file=None,
         anthropic_api_key="sk-ant-test",
         database_url="postgresql+psycopg://kisabella_app:pw@db:5432/test",
-        secret_key="x" * 32,
     )
     monkeypatch.setattr(
         session_module, "get_settings", lambda: fake_settings
@@ -98,38 +97,16 @@ class TestEnsureEngine:
 
 
 class TestGetDb:
-    async def test_sets_app_user_id_via_bindparams(self, monkeypatch):
+    def test_rls_listener_uses_bindparams(self, monkeypatch):
         """Critical: bindparams, NO f-string. ADR-008."""
         settings = _patch_settings(monkeypatch)
+        conn = MagicMock()
 
-        mock_session = AsyncMock()
-        mock_session.execute = AsyncMock()
-        mock_session.commit = AsyncMock()
-        mock_session.rollback = AsyncMock()
+        session_module._set_rls_user(None, None, conn)
 
-        # Context manager mock
-        mock_cm = AsyncMock()
-        mock_cm.__aenter__.return_value = mock_session
-        mock_cm.__aexit__.return_value = None
-
-        mock_maker = MagicMock(return_value=mock_cm)
-        monkeypatch.setattr(session_module, "_ensure_engine", lambda: mock_maker)
-
-        # Iterar el generator
-        async for db in get_db():
-            assert db is mock_session
-            break
-
-        # Verificar que se llamó execute con bindparams (no f-string)
-        call_args = mock_session.execute.call_args
-        sql_text = call_args.args[0]
-        params = call_args.args[1] if len(call_args.args) > 1 else call_args.kwargs
-
-        # El texto SQL debe usar :uid (bindparam), no la string interpolada
-        sql_str = str(sql_text)
-        assert ":uid" in sql_str
-        assert settings.app_user_id not in sql_str  # NO debe estar interpolada
-        # Los params deben tener uid
+        sql_text, params = conn.execute.call_args.args
+        assert ":uid" in str(sql_text)
+        assert settings.app_user_id not in str(sql_text)  # NO interpolada
         assert params == {"uid": settings.app_user_id}
 
     async def test_commits_on_success(self, monkeypatch):

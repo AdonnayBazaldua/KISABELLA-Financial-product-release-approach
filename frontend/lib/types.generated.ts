@@ -116,6 +116,9 @@ export interface paths {
         /**
          * Stream Chat Message
          * @description SSE stream de tokens para un mensaje de asistente en status=streaming.
+         *
+         *     El generador corre cuando la sesión del request ya se cerró, así que abre
+         *     sesiones propias y cortas: no retiene una conexión del pool durante el stream.
          */
         get: operations["stream_chat_message_api_v1_evaluations__eval_id__chat_messages__message_id__stream_get"];
         put?: never;

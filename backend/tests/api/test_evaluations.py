@@ -1,5 +1,6 @@
 """Tests E2E del endpoint /api/v1/evaluations."""
 
+from tests.conftest import from_ip
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
@@ -58,7 +59,6 @@ def fake_settings():
         _env_file=None,
         anthropic_api_key="sk-ant-test",
         database_url="postgresql+psycopg://kisabella_app:pw@db:5432/test",
-        secret_key="x" * 32,
         allowed_ips="127.0.0.1",
         next_public_api_url="http://localhost:3000",
         app_user_id=str(TEST_USER_ID),
@@ -130,7 +130,7 @@ def app(monkeypatch, fake_settings, fake_db_session, fake_llm):
 
 @pytest.fixture
 def client(app):
-    return TestClient(app, headers={"X-Forwarded-For": "127.0.0.1"})
+    return from_ip(app, "127.0.0.1")
 
 
 # ===== Tests =====
@@ -236,11 +236,11 @@ class TestListEvaluations:
 
     def test_rejects_invalid_limit(self, client):
         r = client.get("/api/v1/evaluations?limit=0")
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_rejects_invalid_offset(self, client):
         r = client.get("/api/v1/evaluations?offset=-1")
-        assert r.status_code == 400
+        assert r.status_code == 422
 
 
 class TestBackgroundTaskRegistered:
