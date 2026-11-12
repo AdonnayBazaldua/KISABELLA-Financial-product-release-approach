@@ -15,7 +15,7 @@ Este directorio guarda decisiones arquitectónicas significativas tomadas durant
 | [0007](0007-langchain-anthropic-obligatorio.md) | langchain-anthropic como único SDK LLM | aceptado |
 | [0008](0008-rls-efectivo-con-force.md) | RLS efectivo con FORCE y rol no-owner | aceptado |
 | [0009](0009-deploy-ionos-vps.md) | Deploy en VPS IONOS | reemplazado por ADR-0019 |
-| [0010](0010-nginx-ip-whitelist-https.md) | Nginx con IP whitelist dinámica + HTTPS | aceptado |
+| [0010](0010-nginx-ip-whitelist-https.md) | Nginx con IP whitelist dinámica + HTTPS | retirado (ver nota) |
 | [0011](0011-tools-directos-no-bind-tools.md) | Tools (Tavily/Banxico) llamados directo, no via bind_tools | aceptado |
 | [0012](0012-cobertura-minima-tests.md) | Cobertura mínima 70% en agents + FakeLLMClient obligatorio | aceptado |
 | [0013](0013-pesos-score-compuesto.md) | Pesos del score compuesto | aceptado |
