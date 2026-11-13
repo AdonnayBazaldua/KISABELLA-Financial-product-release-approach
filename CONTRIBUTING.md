@@ -27,6 +27,12 @@ cd frontend && npm run check:types && npm run lint && npm run build
 scripts/test-rls.sh              # only if you touched the DB, sessions or background tasks (needs Docker)
 ```
 
+If you changed a prompt or the model, you can also run the golden set against the **real** model (optional, spends your tokens, never runs in CI):
+
+```bash
+cd backend && python -m scripts.eval_real    # exits 1 if a known case gets an unexpected verdict
+```
+
 ## Ground rules
 
 - **Tests first.** New behaviour or bug fixes come with a test that fails without the change. Tests never hit the network or a real LLM.
