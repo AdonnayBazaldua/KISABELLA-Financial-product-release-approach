@@ -1,5 +1,6 @@
 """Tests del endpoint GET /api/v1/evaluations/compare."""
 
+from tests.conftest import from_ip
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
@@ -64,6 +65,7 @@ def _make_complete_evaluation(eval_id: UUID | None = None) -> EvaluationModel:
             analisis_extenso="a" * 400,
             hallazgos_clave=["h1"],
             recomendaciones=["r1"],
+            error_message=None,
         )
         for name in ("financiero", "mercado", "riesgo", "estrategia")
     ]
@@ -102,7 +104,6 @@ def fake_settings():
         _env_file=None,
         anthropic_api_key="sk-ant-test",
         database_url="postgresql+psycopg://kisabella_app:pw@db:5432/test",
-        secret_key="x" * 32,
         allowed_ips="127.0.0.1",
         next_public_api_url="http://localhost:3000",
         app_user_id=str(TEST_USER_ID),
@@ -172,7 +173,7 @@ def app(monkeypatch, fake_settings, fake_db_session, fake_llm):
 
 @pytest.fixture
 def client(app):
-    return TestClient(app, headers={"X-Forwarded-For": "127.0.0.1"})
+    return from_ip(app, "127.0.0.1")
 
 
 # ===== Tests =====

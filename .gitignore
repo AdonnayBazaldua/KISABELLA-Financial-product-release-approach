@@ -1,19 +1,4 @@
 # ============================================================
-# Claude Code / skills / agentes — TODO ignorado hasta commit final
-# ============================================================
-.claude/
-.agents/
-.claude-ik/
-skills-lock.json
-docs/superpowers/
-docs/agents/
-CONTEXT.md.bak
-CLAUDE.md
-CONTEXT.md
-docs/status/
-*.tmp.*
-
-# ============================================================
 # Secrets & env
 # ============================================================
 .env

@@ -21,12 +21,11 @@ services:
     env_file: ${ENV_FILE:-.env}
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?Define ANTHROPIC_API_KEY en .env}
-      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY (>=32 chars) en .env}
       # Vacío = sin whitelist (en local el backend ve la IP del gateway Docker, no 127.0.0.1).
       ALLOWED_IPS: ${ALLOWED_IPS:-}
       # La app usa el rol NO-dueño (RLS efectivo); Alembic migra como dueño.
-      DATABASE_URL: postgresql+asyncpg://kisabella_app:${DB_PASSWORD:?Define DB_PASSWORD en .env}@db:5432/kisabella
-      MIGRATION_DATABASE_URL: postgresql+asyncpg://kisabella:${DB_PASSWORD}@db:5432/kisabella
+      DATABASE_URL: postgresql+asyncpg://kisabella_app:${APP_DB_PASSWORD:?Define APP_DB_PASSWORD en .env}@db:5432/kisabella
+      MIGRATION_DATABASE_URL: postgresql+asyncpg://kisabella:${DB_PASSWORD:?Define DB_PASSWORD en .env}@db:5432/kisabella
     volumes:
       - uploads_data:/data/uploads
     depends_on:
@@ -51,7 +50,7 @@ services:
       POSTGRES_DB: kisabella
       POSTGRES_USER: kisabella
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en .env}
-      APP_DB_PASSWORD: ${DB_PASSWORD}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kisabella -d kisabella"]
       interval: 5s

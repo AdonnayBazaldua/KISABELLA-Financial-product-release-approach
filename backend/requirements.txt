@@ -20,6 +20,7 @@ tavily-python>=0.3,<0.4
 # LLM stack — ADR-007 langchain-anthropic, NO SDK anthropic directo
 langchain>=0.3.10,<0.4
 langchain-anthropic>=0.3.3,<0.4
+langchain-core>=0.3.49,<0.4  # get_usage_metadata_callback
 langgraph>=0.2.59,<0.3
 anthropic>=0.42,<1.0
 
@@ -32,7 +33,7 @@ tenacity>=8.5,<10
 # Structured logging
 structlog>=24,<26
 
-# Chat + uploads (Sprint 5)
+# Chat + uploads
 markitdown[pdf,docx,xlsx]>=0.0.1a4,<0.1
 sse-starlette>=2.1,<3
 filetype>=1.2,<2

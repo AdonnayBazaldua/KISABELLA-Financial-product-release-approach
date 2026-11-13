@@ -1,4 +1,4 @@
-"""Agente Orquestador — sintesis ejecutiva con LLM (Sprint 3).
+"""Agente Orquestador — sintesis ejecutiva con LLM.
 
 Score y veredicto son SIEMPRE deterministicos (weighted_final_score + verdict_from_score).
 El LLM solo genera la justificacion rica cuando >=3 agentes OK.

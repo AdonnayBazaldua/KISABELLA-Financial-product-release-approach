@@ -106,7 +106,7 @@ def upgrade() -> None:
     )
     op.create_index("idx_agent_results_evaluation", "agent_results", ["evaluation_id"])
 
-    # --- chat_messages (Sprint 5, tabla preparada) ---
+    # --- chat_messages ---
     op.create_table(
         "chat_messages",
         sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),

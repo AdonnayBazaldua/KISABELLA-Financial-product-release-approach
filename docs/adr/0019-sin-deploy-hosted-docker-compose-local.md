@@ -20,12 +20,12 @@ máquina de quien lo clona con `docker compose up --build`, usando **su propia**
 
 - Las migraciones corren al arrancar el backend (`alembic upgrade head`) como
   rol dueño; la app se conecta como `kisabella_app` sin privilegios (ADR-0008).
-- `ANTHROPIC_API_KEY`, `SECRET_KEY` y `DB_PASSWORD` son obligatorias: sin ellas
+- `ANTHROPIC_API_KEY`, `DB_PASSWORD` y `APP_DB_PASSWORD` son obligatorias: sin ellas
   `docker compose` falla en vez de arrancar a medias.
 - Los puertos se publican solo en `127.0.0.1`.
 - `ALLOWED_IPS` vacío permite todas las IPs (necesario tras el gateway de
   Docker); quien lo exponga a internet debe poner un reverse proxy y definirlo
-  (la config de Nginx del repo sigue disponible, fuera del compose).
+  (el repo no incluye configuración de proxy; ver nota en ADR-0010).
 
 ## Consecuencias
 

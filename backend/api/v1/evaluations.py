@@ -13,8 +13,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncContextManager, Callable
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from sqlalchemy import event, text
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agents.llm_client import LLMClient, get_llm_client
@@ -35,27 +34,20 @@ router = APIRouter(prefix="/api/v1", tags=["evaluations"])
 
 
 def get_user_id(settings: Settings = Depends(get_settings)) -> UUID:
-    """Sprint 1: user_id viene de settings (sin auth multi-user)."""
+    """Usuario único implícito: viene de settings (no hay cuentas)."""
     return UUID(settings.app_user_id)
 
 
-def get_background_session_factory(
-    settings: Settings = Depends(get_settings),
-) -> Callable[[], AsyncContextManager[AsyncSession]]:
-    """Factory de session para BackgroundTasks (no comparte con la del request)."""
+def get_background_session_factory() -> Callable[[], AsyncContextManager[AsyncSession]]:
+    """Factory de sesiones para trabajo fuera del request (BackgroundTasks, SSE).
+
+    La sesión del request ya está cerrada cuando ese trabajo corre; cada uso abre la suya.
+    El contexto RLS lo pone db.session en cada transacción.
+    """
 
     @asynccontextmanager
     async def _factory():
-        maker = _ensure_engine()
-        async with maker() as session:
-            # set_config es transaccional: commit/rollback lo pierden → re-aplicar en cada BEGIN.
-            @event.listens_for(session.sync_session, "after_begin")
-            def _set_rls_user(_s, _tx, conn):
-                conn.execute(
-                    text("SELECT set_config('app.user_id', :uid, true)"),
-                    {"uid": settings.app_user_id},
-                )
-
+        async with _ensure_engine()() as session:
             try:
                 yield session
             except Exception:
@@ -151,11 +143,7 @@ async def get_evaluation(
 async def list_evaluations(
     db: AsyncSession = Depends(get_db),
     service: EvaluationService = Depends(get_eval_service),
-    limit: int = 20,
-    offset: int = 0,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
 ) -> list[EvaluationSummary]:
-    if limit < 1 or limit > 100:
-        raise HTTPException(status_code=400, detail="limit debe estar entre 1 y 100")
-    if offset < 0:
-        raise HTTPException(status_code=400, detail="offset debe ser >= 0")
     return await service.list_evaluations(db, limit=limit, offset=offset)

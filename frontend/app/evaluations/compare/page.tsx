@@ -8,9 +8,9 @@ export const dynamic = "force-dynamic";
 export default async function ComparePage({
   searchParams,
 }: {
-  searchParams: { ids?: string };
+  searchParams: Promise<{ ids?: string }>;
 }) {
-  const idsParam = searchParams.ids;
+  const idsParam = (await searchParams).ids;
   if (!idsParam) redirect("/dashboard");
 
   const ids = idsParam.split(",").filter(Boolean);

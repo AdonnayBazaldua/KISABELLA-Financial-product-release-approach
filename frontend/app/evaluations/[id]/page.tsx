@@ -18,15 +18,16 @@ async function getChatMessages(evalId: string) {
   }
 }
 
-export default async function EvaluationPage({ params }: { params: { id: string } }) {
+export default async function EvaluationPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   let evaluation;
   try {
-    evaluation = await api.getEvaluation(params.id);
+    evaluation = await api.getEvaluation(id);
   } catch {
     notFound();
   }
 
-  const messages = await getChatMessages(params.id);
+  const messages = await getChatMessages(id);
 
   return (
     <div className="max-w-3xl mx-auto px-4">
@@ -37,7 +38,7 @@ export default async function EvaluationPage({ params }: { params: { id: string 
       </div>
       <Scorecard evaluation={evaluation} />
       <div className="mt-8 mb-8">
-        <ChatPanel evalId={params.id} initialMessages={messages} />
+        <ChatPanel evalId={id} initialMessages={messages} />
       </div>
     </div>
   );

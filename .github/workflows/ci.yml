@@ -26,7 +26,7 @@ jobs:
       - run: pip install -r backend/requirements-dev.txt
       - name: Unit and API tests (no network, fake LLM)
         working-directory: backend
-        run: pytest -q
+        run: pytest -q --cov=agents --cov-fail-under=70  # ADR-0012
       - name: Row-Level Security against a disposable Postgres 16
         run: PYTHON=python scripts/test-rls.sh
 
@@ -45,7 +45,7 @@ jobs:
           cache-dependency-path: backend/requirements*.txt
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       # el backend se instala solo para regenerar los tipos desde su OpenAPI

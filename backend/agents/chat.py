@@ -21,6 +21,7 @@ from agents.chat_processing import (
     cleanup_stream_queue,
     create_stream_queue,
 )
+from agents.base import untrusted
 from agents.llm_client import LLMClient
 from db.models import ChatAttachment, ChatMessage, Evaluation
 
@@ -105,7 +106,8 @@ async def _process_chat_turn(
             if att.markdown_extracted:
                 user_content.append({
                     "type": "text",
-                    "text": f"\n\n[Archivo: {att.original_name}]\n{att.markdown_extracted}",
+                    "text": f"\n\n[Archivo: {att.original_name}]\n"
+                    + untrusted("archivo_adjunto", att.markdown_extracted),
                 })
             elif att.mime_type.startswith("image/"):
                 import base64
@@ -128,7 +130,6 @@ async def _process_chat_turn(
         all_messages = [*system_blocks, *history_msgs, current_user_msg]
 
         # --- Streaming de tokens ---
-        char_count = 0
         async for token in llm.stream_text(
             all_messages,
             temperature=temperature,
@@ -136,22 +137,6 @@ async def _process_chat_turn(
         ):
             full_content += token
             await q.put(token)
-            char_count += len(token)
-
-            # Flush periódico cada ~50 caracteres para que el SSE tenga datos recientes
-            if char_count >= 50:
-                char_count = 0
-                try:
-                    flush_result = await session.execute(
-                        select(ChatMessage).where(ChatMessage.id == assistant_msg_id)
-                    )
-                    asst_flush = flush_result.scalar_one_or_none()
-                    if asst_flush is not None:
-                        asst_flush.content = full_content
-                        asst_flush.updated_at = datetime.now(timezone.utc)
-                        await session.flush()
-                except Exception:
-                    pass  # Non-fatal — final commit will persist the full content
 
         # --- Escritura final ---
         final_result = await session.execute(

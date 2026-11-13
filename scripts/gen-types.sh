@@ -9,8 +9,7 @@ py="${PYTHON:-$root/backend/.venv/bin/python}"
 [ -x "$py" ] || py=python3
 
 (cd "$root/backend" && \
-  ANTHROPIC_API_KEY=x DB_PASSWORD=x SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
-  DATABASE_URL=postgresql+asyncpg://x:x@localhost/x \
+  ANTHROPIC_API_KEY=x DATABASE_URL=postgresql+asyncpg://x:x@localhost/x \
   "$py" -c "import json; from main import create_app; print(json.dumps(create_app().openapi()))" \
   > "$tmp/openapi.json")
 

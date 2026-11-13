@@ -1,12 +1,8 @@
 """EvaluationService — orquesta DB + pipeline + serialización a DTOs.
 
 ADR-006: el endpoint POST devuelve 202 inmediato; el pipeline corre en
-BackgroundTask. El service expone create() (sync con DB) y run_pipeline()
-(async, llamado desde BackgroundTask con su propia session).
-
-Sprint 1 / Fase 0: el flujo es funcional pero algunos detalles son stub:
-- TC viene del payload (Banxico real en Sprint 6).
-- Watchdog de huérfanos: TODO (Sprint 6).
+BackgroundTask. El service expone create() (dentro del request) y run_pipeline()
+(llamado desde BackgroundTask con su propia sesión).
 """
 
 from __future__ import annotations
@@ -25,9 +21,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from langchain_core.callbacks import get_usage_metadata_callback
+
 from agents.contracts import (
-    TCSource,
     AgentError,
+    TCSource,
     AgentResult,
     EvaluationInputs,
     TCMetadata,
@@ -68,30 +66,16 @@ def resolve_tc(
     return ("banxico", []) if kind == "banxico" else ("fallback_db", ["warn_fx"])
 
 
+# Campos de costos/ingresos/TC: idénticos en el request HTTP, el contrato interno y la tabla.
+_SHARED_FIELDS = set(EvaluationInputs.model_fields) - {"exchange_rate_at", "tc_source"}
+
+
 def _inputs_from_request(
     req: CreateEvaluationRequest, tc_source: TCSource = "user_provided"
 ) -> EvaluationInputs:
     """Mapea HTTP request → EvaluationInputs interno del pipeline."""
     return EvaluationInputs(
-        product_name=req.product_name,
-        description=req.description,
-        category=req.category,
-        sales_channel=req.sales_channel,
-        cost_purchase=req.cost_purchase,
-        cost_purchase_usd=req.cost_purchase_usd,
-        cost_freight=req.cost_freight,
-        cost_customs=req.cost_customs,
-        cost_storage=req.cost_storage,
-        cost_logistics_vehicle=req.cost_logistics_vehicle,
-        cost_logistics_viaticos=req.cost_logistics_viaticos,
-        cost_logistics_personnel=req.cost_logistics_personnel,
-        cost_shrinkage_pct=req.cost_shrinkage_pct,
-        cost_commission_pct=req.cost_commission_pct,
-        cost_marketing=req.cost_marketing,
-        cost_overhead=req.cost_overhead,
-        target_price=req.target_price,
-        estimated_units_month=req.estimated_units_month,
-        exchange_rate_used=req.exchange_rate_used,
+        **req.model_dump(include=_SHARED_FIELDS),
         exchange_rate_at=datetime.now(timezone.utc),
         tc_source=tc_source,
     )
@@ -101,71 +85,13 @@ def _eval_row_from_request(
     req: CreateEvaluationRequest, user_id: UUID, eval_id: UUID
 ) -> tuple[Evaluation, EvaluationInput]:
     """Construye las dos rows (Evaluation + EvaluationInput) desde el payload."""
-    eval_row = Evaluation(
-        id=eval_id,
-        created_by=user_id,
-        name=req.name,
-        status="pending",
-    )
+    eval_row = Evaluation(id=eval_id, created_by=user_id, name=req.name, status="pending")
     inputs_row = EvaluationInput(
         evaluation_id=eval_id,
-        product_name=req.product_name,
-        description=req.description,
-        category=req.category,
-        cost_purchase=req.cost_purchase,
-        cost_purchase_usd=req.cost_purchase_usd,
-        cost_freight=req.cost_freight,
-        cost_customs=req.cost_customs,
-        cost_storage=req.cost_storage,
-        cost_logistics_vehicle=req.cost_logistics_vehicle,
-        cost_logistics_viaticos=req.cost_logistics_viaticos,
-        cost_logistics_personnel=req.cost_logistics_personnel,
-        cost_shrinkage_pct=req.cost_shrinkage_pct,
-        cost_commission_pct=req.cost_commission_pct,
-        cost_marketing=req.cost_marketing,
-        cost_overhead=req.cost_overhead,
-        target_price=req.target_price,
-        estimated_units_month=req.estimated_units_month,
-        sales_channel=req.sales_channel,
-        exchange_rate_used=req.exchange_rate_used,
+        **req.model_dump(include=_SHARED_FIELDS),
         exchange_rate_at=datetime.now(timezone.utc),
     )
     return eval_row, inputs_row
-
-
-def _agent_result_to_dto(name: str, item: AgentResult | AgentError | None) -> AgentResultDTO:
-    """Serializa AgentResult/AgentError/None → DTO HTTP."""
-    if item is None:
-        return AgentResultDTO(
-            agent_name=name,
-            status="pending",
-            score=None,
-            veredicto_corto=None,
-            analisis_extenso=None,
-            hallazgos_clave=[],
-            recomendaciones=[],
-        )
-    if isinstance(item, AgentError):
-        return AgentResultDTO(
-            agent_name=name,
-            status="failed",
-            score=None,
-            veredicto_corto=None,
-            analisis_extenso=None,
-            hallazgos_clave=[],
-            recomendaciones=[],
-            error_message=item.error_message,
-        )
-    # AgentResult
-    return AgentResultDTO(
-        agent_name=name,
-        status="ok",
-        score=item.score,
-        veredicto_corto=item.veredicto_corto,
-        analisis_extenso=item.analisis_extenso,
-        hallazgos_clave=list(item.hallazgos_clave),
-        recomendaciones=list(item.recomendaciones),
-    )
 
 
 def compute_idempotency_hash(user_id: UUID, payload: dict) -> str:
@@ -262,16 +188,24 @@ class EvaluationService:
             async with self._session_factory() as session:
                 await self._mark_status(session, eval_id, "running")
 
-            final_state = await run_evaluation(
-                inputs, tc_meta, self._llm, eval_id=eval_id, user_id=self._user_id,
-                warn_flags=warn_flags,
-            )
+            # Consumo real reportado por la API (no la estimacion del presupuesto).
+            with get_usage_metadata_callback() as usage_cb:
+                final_state = await run_evaluation(
+                    inputs, tc_meta, self._llm, eval_id=eval_id, user_id=self._user_id,
+                    warn_flags=warn_flags,
+                )
+            per_model = usage_cb.usage_metadata.values()
+            usage = {
+                "tokens_input": sum(u["input_tokens"] for u in per_model),
+                "tokens_output": sum(u["output_tokens"] for u in per_model),
+            }
 
             async with self._session_factory() as session:
-                await self._persist_results(session, eval_id, final_state)
+                await self._persist_results(session, eval_id, final_state, usage)
             log.info(
                 "pipeline_complete",
                 evaluation_id=str(eval_id),
+                **usage,
                 duration_ms=int((time.monotonic() - t0) * 1000),
             )
         except Exception as exc:  # noqa: BLE001
@@ -307,7 +241,8 @@ class EvaluationService:
             await session.commit()
 
     async def _persist_results(
-        self, session: AsyncSession, eval_id: UUID, final_state: dict
+        self, session: AsyncSession, eval_id: UUID, final_state: dict,
+        usage: dict | None = None,
     ) -> None:
         result = await session.execute(
             select(Evaluation).where(Evaluation.id == eval_id)
@@ -333,8 +268,17 @@ class EvaluationService:
                         recomendaciones=list(item.recomendaciones),
                     )
                 )
+            elif isinstance(item, AgentError):
+                session.add(
+                    AgentResultRow(
+                        evaluation_id=eval_id, agent_name=name, error_message=item.error_message
+                    )
+                )
 
         ev.status = "complete"
+        if usage:
+            ev.tokens_input = usage["tokens_input"] or None
+            ev.tokens_output = usage["tokens_output"] or None
         if verdict is not None:
             ev.final_verdict = verdict.veredicto
             ev.final_score = verdict.score_final
@@ -365,7 +309,7 @@ class EvaluationService:
         dtos: list[AgentResultDTO] = []
         for name in AGENTS.keys():
             ar = agents_by_name.get(name)
-            if ar is None:
+            if ar is None or ar.error_message:
                 progress[name] = "pending" if ev.status != "complete" else "failed"
                 dtos.append(
                     AgentResultDTO(
@@ -376,6 +320,7 @@ class EvaluationService:
                         analisis_extenso=None,
                         hallazgos_clave=[],
                         recomendaciones=[],
+                        error_message=ar.error_message if ar else None,
                     )
                 )
             else:
@@ -405,6 +350,8 @@ class EvaluationService:
             error_message=ev.error_message,
             warn_flags=ev.warn_flags or [],
             requires_human_review=ev.requires_human_review or False,
+            tokens_input=ev.tokens_input,
+            tokens_output=ev.tokens_output,
             progress=progress,
             agent_results=dtos,
             created_at=ev.created_at,

@@ -32,6 +32,8 @@ class Evaluation(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     warn_flags: Mapped[list] = mapped_column(JSON, default=list)
     requires_human_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    tokens_input: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens_output: Mapped[int | None] = mapped_column(Integer, nullable=True)
     idempotency_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -83,6 +85,7 @@ class AgentResult(Base):
     hallazgos_clave: Mapped[list] = mapped_column(JSON, default=list)
     recomendaciones: Mapped[list] = mapped_column(JSON, default=list)
     raw_calculations: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     evaluation: Mapped["Evaluation"] = relationship(back_populates="agent_results")

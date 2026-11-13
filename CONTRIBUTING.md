@@ -5,7 +5,7 @@ Thanks for your interest! Issues and pull requests are welcome. The UI, prompts 
 ## Setup
 
 ```bash
-cp .env.example .env            # set ANTHROPIC_API_KEY, DB_PASSWORD, SECRET_KEY (≥ 32 chars)
+cp .env.example .env            # set ANTHROPIC_API_KEY, DB_PASSWORD and APP_DB_PASSWORD
 docker compose up --build       # full stack on http://localhost:3000
 
 # backend
@@ -25,6 +25,12 @@ cd backend && pytest -q          # no network; the LLM is faked (FakeLLMClient)
 cd frontend && npm test          # vitest
 cd frontend && npm run check:types && npm run lint && npm run build
 scripts/test-rls.sh              # only if you touched the DB, sessions or background tasks (needs Docker)
+```
+
+If you changed a prompt or the model, you can also run the golden set against the **real** model (optional, spends your tokens, never runs in CI):
+
+```bash
+cd backend && python -m scripts.eval_real    # exits 1 if a known case gets an unexpected verdict
 ```
 
 ## Ground rules

@@ -1,8 +1,6 @@
 """Middleware de seguridad: IP whitelist + security headers.
 
-Nginx aplica IP whitelist primero (entrypoint renderea allow desde ALLOWED_IPS).
-Este middleware es defensa-en-profundidad — si Nginx falla o se accede al
-backend directamente (puerto 8000), aún rechaza IPs no autorizadas.
+La whitelist (ALLOWED_IPS) rechaza con 403 cualquier IP no listada; vacía = sin restricción.
 
 Headers de seguridad via la lib `secure`:
 - Strict-Transport-Security (HSTS)
@@ -39,20 +37,11 @@ def _build_secure_headers() -> secure_lib.Secure:
 
 
 def _client_ip(request: Request) -> str:
-    """Extrae la IP real del cliente.
-
-    Detrás de Nginx, real IP viene en X-Forwarded-For (primer hop) o X-Real-IP.
-    Sin Nginx (acceso directo en dev), usa request.client.host.
+    """IP del extremo TCP. Los encabezados X-Forwarded-For / X-Real-IP NO se leen aquí:
+    cualquiera puede falsificarlos. Detrás de un reverse proxy, uvicorn reescribe
+    request.client solo para proxies de confianza (--forwarded-allow-ips / FORWARDED_ALLOW_IPS).
     """
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
-    real_ip = request.headers.get("x-real-ip")
-    if real_ip:
-        return real_ip.strip()
-    if request.client:
-        return request.client.host
-    return ""
+    return request.client.host if request.client else ""
 
 
 def _parse_allowed(allowed_csv: str) -> set[str]:
@@ -87,8 +76,20 @@ class IPWhitelistMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# Swagger UI / ReDoc cargan JS y CSS desde un CDN y usan un script inline.
+_DOCS_PATHS = {"/docs", "/redoc"}
+_DOCS_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+    "font-src https://fonts.gstatic.com; "
+    "img-src 'self' data: https://fastapi.tiangolo.com https://cdn.redoc.ly; "
+    "worker-src blob:; frame-ancestors 'none'"
+)
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Aplica headers de seguridad a TODA respuesta."""
+    """Aplica headers de seguridad a TODA respuesta (CSP relajado solo en la documentación)."""
 
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
@@ -99,4 +100,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # secure 0.3: .headers() es método, retorna dict
         for header_name, header_value in self._secure.headers().items():
             response.headers[header_name] = header_value
+        if request.url.path in _DOCS_PATHS:
+            response.headers["Content-Security-Policy"] = _DOCS_CSP
         return response

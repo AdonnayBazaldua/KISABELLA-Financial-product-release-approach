@@ -47,7 +47,6 @@ def mock_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         tavily_api_key="test-tavily",
         banxico_token="test-banxico-token",
         database_url="postgresql+asyncpg://test:test@localhost/test",
-        secret_key="test-secret-key-that-is-at-least-32-characters-long-yes!",
         allowed_ips="127.0.0.1",
         app_user_id="00000000-0000-0000-0000-000000000001",
     )
@@ -151,3 +150,17 @@ class FakeStorage:
 @pytest.fixture
 def fake_storage() -> FakeStorage:
     return FakeStorage()
+
+
+# ---------- TestClient con IP de origen ----------
+
+def from_ip(app, ip: str, **kwargs):
+    """TestClient cuya conexión TCP viene de `ip` (lo que ve la IP whitelist)."""
+    from fastapi.testclient import TestClient
+
+    async def _with_client(scope, receive, send):
+        if scope["type"] == "http":
+            scope["client"] = (ip, 50000)
+        await app(scope, receive, send)
+
+    return TestClient(_with_client, **kwargs)

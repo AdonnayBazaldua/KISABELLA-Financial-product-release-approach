@@ -23,7 +23,6 @@ def _valid_settings_kwargs(**overrides):
     base = dict(
         anthropic_api_key="sk-ant-test",
         database_url="postgresql+psycopg://u:p@db:5432/test",
-        secret_key="x" * 32,
     )
     base.update(overrides)
     return base

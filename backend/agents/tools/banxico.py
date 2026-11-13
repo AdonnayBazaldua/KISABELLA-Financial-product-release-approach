@@ -27,6 +27,8 @@ async def get_usd_mxn() -> tuple[Decimal, str]:
     token = settings.banxico_token.get_secret_value()
 
     try:
+        if not token:
+            raise RuntimeError("BANXICO_TOKEN no configurado")
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(url, headers={"Bmx-Token": token})
             resp.raise_for_status()

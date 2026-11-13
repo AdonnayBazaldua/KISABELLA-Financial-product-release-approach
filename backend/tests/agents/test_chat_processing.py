@@ -87,6 +87,15 @@ def test_build_system_blocks_second_block_has_eval_context():
     assert "viable" in content
 
 
+def test_system_context_block_is_marked_for_prompt_caching():
+    """Bug: cache_control iba en additional_kwargs, que langchain-anthropic descarta.
+    Debe ir en el bloque de contenido para que llegue a la API."""
+    blocks = build_system_blocks(_make_evaluation())
+    last = blocks[-1].content[-1]
+    assert last["cache_control"] == {"type": "ephemeral"}
+    assert "Test Producto" in last["text"]
+
+
 def test_build_history_messages_empty():
     msgs = build_history_messages([])
     assert msgs == []

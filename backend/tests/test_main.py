@@ -1,5 +1,6 @@
 """Tests E2E del app FastAPI — middleware + health."""
 
+from tests.conftest import from_ip
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -19,7 +20,6 @@ def fake_settings(monkeypatch):
         _env_file=None,
         anthropic_api_key="sk-ant-test",
         database_url="postgresql+psycopg://kisabella_app:pw@db:5432/test",
-        secret_key="x" * 32,
         allowed_ips="127.0.0.1,10.0.0.5",
         frontend_origin="http://localhost:3000",
     )
@@ -46,7 +46,7 @@ def app(fake_settings, monkeypatch):
 
 @pytest.fixture
 def client(app):
-    return TestClient(app, headers={"X-Forwarded-For": "127.0.0.1"})
+    return from_ip(app, "127.0.0.1")
 
 
 class TestHealth:
@@ -67,20 +67,23 @@ class TestHealth:
 
 class TestIPWhitelist:
     def test_whitelisted_ip_passes(self, client):
-        # X-Forwarded-For 127.0.0.1 está en allowed_ips
-        # health funciona pero no expone IP check; busquemos algo más
-        r = client.get("/health")
-        assert r.status_code == 200
+        assert client.get("/openapi.json").status_code == 200
+
+    def test_spoofed_forwarded_header_does_not_bypass_whitelist(self, app):
+        """Bug: el backend creia a X-Forwarded-For viniera de quien viniera."""
+        spoof = {"X-Forwarded-For": "127.0.0.1", "X-Real-IP": "127.0.0.1"}
+        with from_ip(app, "9.9.9.9", headers=spoof) as c:
+            assert c.get("/openapi.json").status_code == 403
 
     def test_non_whitelisted_ip_rejected(self, app):
         # No /health — verificamos contra OpenAPI que sí pasa por whitelist
-        with TestClient(app, headers={"X-Forwarded-For": "9.9.9.9"}) as c:
+        with from_ip(app, "9.9.9.9") as c:
             r = c.get("/openapi.json")
         assert r.status_code == 403
         assert r.json()["code"] == "IP_NOT_WHITELISTED"
 
     def test_health_bypasses_whitelist(self, app):
-        with TestClient(app, headers={"X-Forwarded-For": "9.9.9.9"}) as c:
+        with from_ip(app, "9.9.9.9") as c:
             r = c.get("/health")
         assert r.status_code == 200
 
@@ -100,6 +103,13 @@ class TestSecurityHeaders:
         r = client.get("/health")
         assert r.headers["x-content-type-options"].lower() == "nosniff"
 
+    def test_docs_csp_allows_swagger_assets(self, client):
+        """Bug: /docs quedaba en blanco porque el CSP bloqueaba el CDN de Swagger UI."""
+        csp = client.get("/docs").headers["content-security-policy"]
+        assert "https://cdn.jsdelivr.net" in csp
+        # el resto de la API conserva el CSP estricto
+        assert "cdn.jsdelivr.net" not in client.get("/openapi.json").headers["content-security-policy"]
+
     def test_csp_present(self, client):
         r = client.get("/health")
         assert "content-security-policy" in {k.lower() for k in r.headers}
@@ -111,7 +121,7 @@ class TestSecurityHeaders:
 
 class TestCORS:
     def test_allows_configured_origin(self, app):
-        with TestClient(app, headers={"X-Forwarded-For": "127.0.0.1"}) as c:
+        with from_ip(app, "127.0.0.1") as c:
             r = c.options(
                 "/health",
                 headers={
@@ -123,7 +133,7 @@ class TestCORS:
         assert "access-control-allow-origin" in {k.lower() for k in r.headers}
 
     def test_rejects_unknown_origin(self, app):
-        with TestClient(app, headers={"X-Forwarded-For": "127.0.0.1"}) as c:
+        with from_ip(app, "127.0.0.1") as c:
             r = c.options(
                 "/health",
                 headers={
