@@ -70,9 +70,9 @@ sequenceDiagram
 Requirements: [Docker](https://docs.docker.com/get-docker/) with Compose v2, and **your own** [Anthropic API key](https://console.anthropic.com/).
 
 ```bash
-git clone <this-repo-url> && cd <repo-folder>
+git clone https://github.com/AdonnayBazaldua/KISABELLA-Financial-product-release-approach.git && cd KISABELLA-Financial-product-release-approach
 cp .env.example .env
-# edit .env → set ANTHROPIC_API_KEY and DB_PASSWORD
+# edit .env → set ANTHROPIC_API_KEY, DB_PASSWORD and APP_DB_PASSWORD
 docker compose up --build
 ```
 
