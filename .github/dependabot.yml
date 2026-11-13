@@ -1,18 +1,27 @@
 version: 2
+# Las versiones mayores se actualizan a mano: rompen API (secure, eslint, tailwind) y el CI no
+# construye las imagenes Docker, asi que un PR en verde no las valida.
 updates:
   - package-ecosystem: pip
     directory: /backend
     schedule: { interval: weekly }
+    ignore:
+      - { dependency-name: "*", update-types: ["version-update:semver-major"] }
     groups:
       python: { patterns: ["*"] }
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly }
+    ignore:
+      - { dependency-name: "*", update-types: ["version-update:semver-major"] }
     groups:
-      npm: { patterns: ["*"], update-types: [minor, patch] }
+      npm: { patterns: ["*"] }
   - package-ecosystem: docker
     directories: [/backend, /frontend]
     schedule: { interval: monthly }
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
