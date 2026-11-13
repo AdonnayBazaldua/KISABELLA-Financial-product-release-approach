@@ -88,7 +88,7 @@ Llaves opcionales en `.env`: `TAVILY_API_KEY` (búsqueda web del agente de Merca
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS, Radix UI |
+| Frontend | Next.js 15 (App Router), TypeScript, Tailwind CSS, Radix UI |
 | Backend | FastAPI, Python 3.12, SQLAlchemy 2 async, Alembic |
 | IA | Claude (`claude-sonnet-4-6`) vía `langchain-anthropic`, orquestado con LangGraph; salida estructurada validada con Pydantic |
 | Datos | PostgreSQL 16 con Row-Level Security forzado (la app se conecta con un rol no-dueño) |
