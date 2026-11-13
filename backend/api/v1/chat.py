@@ -117,8 +117,8 @@ async def post_chat_message(
 
     # --- Procesar archivos adjuntos ---
     for f in files:
-        # ponytail: lee el archivo completo y luego valida; tope real = client_max_body_size del proxy
-        raw = await f.read()
+        # Un byte más que el límite basta para que save_upload lo rechace sin cargar el archivo entero.
+        raw = await f.read(settings.max_file_size_bytes + 1)
         try:
             uploaded = await save_upload(
                 data=raw,
