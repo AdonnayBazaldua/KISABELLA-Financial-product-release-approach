@@ -1,11 +1,11 @@
 -r requirements.txt
 
 # Testing
-pytest==8.3.4
-pytest-asyncio==0.24.0
-pytest-mock==3.14.0
-pytest-cov>=5,<7
-aiosqlite>=0.20  # DB en memoria para tests (conftest)
+pytest==9.2.0
+pytest-asyncio==1.4.1.post1
+pytest-mock==3.17.0
+pytest-cov>=7.1.0,<8
+aiosqlite>=0.22.1  # DB en memoria para tests (conftest)
 
 # Type checking (opcional — solo si querés correrlo local)
 # mypy>=1.13,<2
