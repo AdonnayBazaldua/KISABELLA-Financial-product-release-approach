@@ -65,6 +65,16 @@ sequenceDiagram
 3. **Chatea** – haz preguntas de seguimiento con respuestas en streaming; adjunta PDF, DOCX, XLSX, CSV, TXT o imágenes (máx. 3 archivos × 5 MB).
 4. **Compara** – marca 2–3 evaluaciones en el dashboard para decidir cuál priorizar.
 
+## Capturas
+
+![Scorecard: veredicto, score global y análisis por agente](docs/screenshots/scorecard.png)
+
+![Formulario de evaluación con los 11 costos](docs/screenshots/formulario.png)
+
+![Chat de seguimiento con respuestas en streaming y adjuntos](docs/screenshots/chat.png)
+
+![Comparativa lado a lado de evaluaciones](docs/screenshots/comparativa.png)
+
 ## Inicio rápido
 
 Requisitos: [Docker](https://docs.docker.com/get-docker/) con Compose v2 y **tu propia** [API key de Anthropic](https://console.anthropic.com/).
