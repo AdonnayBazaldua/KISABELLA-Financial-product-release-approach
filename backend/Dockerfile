@@ -3,7 +3,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev libxml2 libxslt1.1 \
+    libxml2 libxslt1.1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Usuario sin privilegios; dueño del volumen de uploads.
