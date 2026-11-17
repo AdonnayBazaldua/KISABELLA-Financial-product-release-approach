@@ -5,10 +5,10 @@ updates:
   - package-ecosystem: pip
     directory: /backend
     schedule: { interval: weekly }
-    ignore:
-      - { dependency-name: "*", update-types: ["version-update:semver-major"] }
-    groups:
-      python: { patterns: ["*"] }
+    # Solo actualizaciones de seguridad. requirements.txt usa rangos sin lockfile, asi que
+    # Dependabot no sabe la version instalada, se salta el filtro de versiones mayores y
+    # propone combinaciones que pip no puede resolver (anthropic 2.x con langchain-anthropic 0.3).
+    open-pull-requests-limit: 0
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly }
