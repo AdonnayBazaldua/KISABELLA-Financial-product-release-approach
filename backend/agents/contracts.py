@@ -127,7 +127,8 @@ class FinalVerdict(BaseModel):
 
     veredicto: Verdict
     score_final: int = Field(ge=0, le=100)
-    justificacion: str = Field(min_length=100, max_length=5000)
+    # Mismo tope que OrchestratorSynthesis: lo que el LLM puede devolver, el veredicto lo acepta.
+    justificacion: str = Field(min_length=100, max_length=8000)
     requires_human_review: bool = False
     confidence: Confidence = "high"
     warn_flags: list[str] = Field(default_factory=list)
