@@ -84,6 +84,12 @@ export function DashboardClient({
                         </span>
                       )}
                       {verdictBadge(ev.final_verdict as Verdict | null)}
+                      {ev.status === "error" && (
+                        <Badge className="bg-red-50 text-red-700 border-red-200">Error</Badge>
+                      )}
+                      {!isComplete && ev.status !== "error" && (
+                        <Badge className="bg-slate-100 text-slate-600 border-slate-200">En proceso</Badge>
+                      )}
                     </div>
                   </Card>
                 </Link>
