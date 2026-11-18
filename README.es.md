@@ -71,7 +71,7 @@ sequenceDiagram
 
 ![Formulario de evaluación con los 11 costos](docs/screenshots/formulario.png)
 
-![Chat de seguimiento con respuestas en streaming y adjuntos](docs/screenshots/chat.png)
+![Chat de seguimiento: la respuesta llega en streaming](docs/screenshots/chat.gif)
 
 ![Comparativa lado a lado de evaluaciones](docs/screenshots/comparativa.png)
 

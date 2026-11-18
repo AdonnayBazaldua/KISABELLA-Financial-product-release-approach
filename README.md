@@ -71,7 +71,7 @@ sequenceDiagram
 
 ![Evaluation form with the 11 cost components](docs/screenshots/formulario.png)
 
-![Follow-up chat with streaming answers and attachments](docs/screenshots/chat.png)
+![Follow-up chat: the answer streams in token by token](docs/screenshots/chat.gif)
 
 ![Side-by-side comparison of evaluations](docs/screenshots/comparativa.png)
 
