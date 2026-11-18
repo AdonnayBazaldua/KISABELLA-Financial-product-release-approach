@@ -52,6 +52,15 @@ class TestSynthesizeAllOKWithLLM:
         assert v.requires_human_review is False
         assert len(v.justificacion) >= 100
 
+    async def test_long_synthesis_accepted_by_llm_schema_does_not_break_verdict(self):
+        # Caso real: el LLM escribio ~800 palabras (>5000 caracteres); la evaluacion
+        # entera terminaba en error con string_too_long en FinalVerdict.
+        fake = FakeLLMClient()
+        fake.set_response_for(OrchestratorSynthesis, _synth("S" * 6000))
+        state = _state({n: _ar(80) for n in ("financiero", "mercado", "riesgo", "estrategia")})
+        v = await synthesize_verdict(state, fake)
+        assert v.justificacion == "S" * 6000
+
     async def test_mid_scores_con_ajustes(self):
         fake = FakeLLMClient()
         fake.set_response_for(OrchestratorSynthesis, _synth())
